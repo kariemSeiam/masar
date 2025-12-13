@@ -1,0 +1,31 @@
+# Git Commands to Push MASAR to GitHub
+# Run these commands in PowerShell or Git Bash after Git is installed
+
+# Navigate to project directory
+cd e:\BackUp\Disktop2025-12\dev\orchids-masar-app
+
+# Initialize git repository
+git init
+
+# Add all files
+git add .
+
+# Create initial commit
+git commit -m "Initial commit: MASAR - Field visit management app
+
+- Add Next.js 15 app with App Router
+- Implement map view with Mapbox integration
+- Add journey planning and visit tracking
+- Create data management screen
+- Add history and analytics
+- Configure for GitHub Pages deployment
+- Add GitHub Actions workflow"
+
+# Add remote repository
+git remote add origin https://github.com/kariemSeiam/masar.git
+
+# Rename branch to main
+git branch -M main
+
+# Push to GitHub
+git push -u origin main
