@@ -16,6 +16,7 @@ const nextConfig: NextConfig = {
         hostname: '**',
       },
     ],
+    unoptimized: true,
   },
   outputFileTracingRoot: path.resolve(__dirname, '../../'),
   typescript: {
@@ -36,9 +37,6 @@ const nextConfig: NextConfig = {
   basePath: process.env.NODE_ENV === 'production' ? '/masar' : '',
   assetPrefix: process.env.NODE_ENV === 'production' ? '/masar' : '',
   trailingSlash: true,
-  images: {
-    unoptimized: true,
-  },
 } as NextConfig;
 
 export default nextConfig;
