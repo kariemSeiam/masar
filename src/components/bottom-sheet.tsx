@@ -65,7 +65,19 @@ export function BottomSheet({
   const [currentSnapIndex, setCurrentSnapIndex] = useState(defaultSnapPoint);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const windowHeight = typeof window !== 'undefined' ? window.innerHeight : 1080;
+  const [windowHeight, setWindowHeight] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerHeight;
+    }
+    return 1080;
+  });
+  
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleResize = () => setWindowHeight(window.innerHeight);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   
   // Use height instead of y position - height of 0 means closed, positive means open
   const height = useMotionValue(0);
