@@ -2,9 +2,17 @@
 
 import { useState, useMemo, useEffect, useCallback, memo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import dynamic from 'next/dynamic';
 import { List, Map as MapIcon, Filter, X, Minus, GripVertical, MapPin, Circle, CheckCircle, Clock, ChevronDownIcon, Search, Check, Navigation, Target, Locate, Building2, Phone, Globe, CheckSquare, Square, Tag, Calendar } from 'lucide-react';
 import { Place, PlaceStatus, GOVERNORATES, CITIES, STATUS_COLORS, Visit, PLACE_TYPES, PlaceType } from '@/lib/types';
-import { MapView } from '@/components/MapView';
+
+const MapView = dynamic(
+  () => import('@/components/MapView').then((mod) => ({ default: mod.MapView })),
+  {
+    ssr: false,
+    loading: () => <div className="relative w-full h-full overflow-hidden bg-muted animate-pulse" />
+  }
+);
 import { PlaceCard } from '@/components/PlaceCard';
 import { PlaceDetailsSheet } from '@/components/PlaceDetailsSheet';
 import { Button } from '@/components/ui/button';
@@ -1066,7 +1074,7 @@ export function PlanScreen({
                   initial={{ y: 10, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
                   transition={{ delay: 0.2, duration: 0.3, ease: 'easeOut' }}
-                  className="text-xl font-bold mb-4 text-foreground"
+                  className="text-lg font-bold mb-2 text-foreground"
                 >
                   لا توجد أماكن
                 </motion.h3>
@@ -1074,7 +1082,7 @@ export function PlanScreen({
                   initial={{ y: 10, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
                   transition={{ delay: 0.3, duration: 0.3, ease: 'easeOut' }}
-                  className="text-base text-muted-foreground mb-10 leading-relaxed px-4 max-w-xs"
+                  className="text-sm text-muted-foreground max-w-xs leading-relaxed"
                 >
                   {governorates.length === 0 && cities.length === 0
                     ? 'روح لصفحة التجهيز واختار الأماكن اللي عايز تزورها النهاردة'

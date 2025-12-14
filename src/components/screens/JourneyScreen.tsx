@@ -2,9 +2,17 @@
 
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import dynamic from 'next/dynamic';
 import { SkipForward, Flag, Navigation, Phone, MessageCircle, MapPin, Ruler, Clock, Copy, Check } from 'lucide-react';
 import { Place, VisitOutcome } from '@/lib/types';
-import { MapView } from '@/components/MapView';
+
+const MapView = dynamic(
+  () => import('@/components/MapView').then((mod) => ({ default: mod.MapView })),
+  {
+    ssr: false,
+    loading: () => <div className="relative w-full h-full overflow-hidden bg-muted animate-pulse" />
+  }
+);
 import { CheckInModal } from '@/components/CheckInModal';
 import { JourneyComplete } from '@/components/JourneyComplete';
 import { PlaceDetailsSheet } from '@/components/PlaceDetailsSheet';

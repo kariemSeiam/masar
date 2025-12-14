@@ -1,7 +1,5 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Car, MapPin, Sparkles, ArrowRight } from 'lucide-react';
@@ -17,7 +15,6 @@ import { BottomSheetProvider } from '@/lib/bottom-sheet-context';
 type TabId = 'data' | 'plan' | 'journey' | 'history';
 
 export default function MasarApp() {
-  const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('plan');
   const [places, setPlaces] = useState<Place[]>(mockPlaces);
   const [visits, setVisits] = useState<Visit[]>(mockVisits);
@@ -46,11 +43,7 @@ export default function MasarApp() {
   } | null>(null);
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && navigator.geolocation) {
+    if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           setUserLocation({
@@ -257,10 +250,6 @@ export default function MasarApp() {
       governorates: Array.from(governorates),
     })).filter((d) => d.count > 0);
   }, [places]);
-
-  if (!mounted) {
-    return null;
-  }
 
   return (
     <BottomSheetProvider>
