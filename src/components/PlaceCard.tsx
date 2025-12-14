@@ -20,6 +20,7 @@ interface PlaceCardProps {
   journeyIndex?: number;
   onClose?: () => void;
   notesCount?: number;
+  onDetailsClick?: () => void;
 }
 
 function PlaceCardComponent({
@@ -34,6 +35,7 @@ function PlaceCardComponent({
   journeyIndex,
   onClose,
   notesCount = 0,
+  onDetailsClick,
 }: PlaceCardProps) {
   const distance = useMemo(() => {
     if (!userLocation) return null;
@@ -541,7 +543,20 @@ function PlaceCardComponent({
             )}
           </div>
         </div>
-        <ChevronLeft className="w-5 h-5 text-muted-foreground/60 shrink-0 mt-1" />
+        {onDetailsClick ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDetailsClick();
+            }}
+            className="w-5 h-5 text-muted-foreground/60 shrink-0 mt-1 hover:text-primary transition-colors flex items-center justify-center"
+            title="عرض التفاصيل"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+        ) : (
+          <ChevronLeft className="w-5 h-5 text-muted-foreground/60 shrink-0 mt-1" />
+        )}
       </div>
     </motion.div>
   );

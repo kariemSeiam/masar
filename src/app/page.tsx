@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Car } from 'lucide-react';
+import { Car, MapPin, Sparkles, ArrowRight } from 'lucide-react';
 import { Place, Visit, VisitOutcome, CITIES } from '@/lib/types';
 import { mockPlaces, mockVisits } from '@/lib/store';
 import { BottomNav } from '@/components/BottomNav';
@@ -36,6 +36,11 @@ export default function MasarApp() {
     duration: '0 ساعة',
   });
   const [journeyStartTime, setJourneyStartTime] = useState<Date | null>(null);
+  const [initialMapFilters, setInitialMapFilters] = useState<{
+    placeType?: string;
+    governorates?: string[];
+    cities?: string[];
+  } | null>(null);
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -52,6 +57,17 @@ export default function MasarApp() {
       );
     }
   }, []);
+
+  // Clear initial map filters after they've been applied (when tab changes to plan)
+  useEffect(() => {
+    if (activeTab === 'plan' && initialMapFilters) {
+      // Clear filters after a short delay to allow PlanScreen to apply them
+      const timer = setTimeout(() => {
+        setInitialMapFilters(null);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab, initialMapFilters]);
 
   const handleTogglePlace = useCallback((place: Place) => {
     setSelectedPlaces((prev) => {
@@ -157,6 +173,47 @@ export default function MasarApp() {
     setActiveTab('history');
   }, []);
 
+  const handleAddNote = useCallback((placeId: string, note: string) => {
+    const place = places.find((p) => p.id === placeId);
+    if (!place) return;
+
+    const newVisit: Visit = {
+      id: `v${Date.now()}`,
+      placeId: place.id,
+      placeName: place.name,
+      date: new Date(),
+      checkInTime: new Date(),
+      outcome: 'visited',
+      notes: note,
+      isManualNote: true, // Mark as manually added note
+    };
+
+    setVisits((prev) => [...prev, newVisit]);
+  }, [places]);
+
+  const handleDeleteNote = useCallback((visitId: string) => {
+    setVisits((prev) => prev.filter((v) => v.id !== visitId));
+  }, []);
+
+  const handleAddNewPlace = useCallback((newPlace: Omit<Place, 'id' | 'createdAt'>) => {
+    const place: Place = {
+      ...newPlace,
+      id: `p${Date.now()}`,
+      createdAt: new Date(),
+    };
+    
+    // Add to places list
+    setPlaces((prev) => [...prev, place]);
+    
+    // Replace current place in journey with the new place
+    setSelectedPlaces((prev) => {
+      const newPlaces = [...prev];
+      newPlaces[journeyIndex] = place; // Replace current place
+      return newPlaces;
+    });
+    // Keep same journeyIndex - the new place is now at current position
+  }, [journeyIndex]);
+
   const availableData = useMemo(() => {
     const dataMap = new Map<string, { count: number; cities: Set<string>; governorates: Set<string> }>();
     
@@ -207,7 +264,17 @@ export default function MasarApp() {
             transition={{ duration: 0.15, ease: 'easeOut' }}
             style={{ willChange: 'transform, opacity' }}
           >
-            <DataScreen availableData={availableData} />
+            <DataScreen 
+              availableData={availableData}
+              onAddToMap={(type, cities, governorates) => {
+                setInitialMapFilters({
+                  placeType: type,
+                  cities: cities,
+                  governorates: governorates,
+                });
+                setActiveTab('plan');
+              }}
+            />
           </motion.div>
         )}
 
@@ -232,6 +299,11 @@ export default function MasarApp() {
               visits={visits}
               onViewModeChange={setPlanViewMode}
               availableData={availableData}
+              onAddNote={handleAddNote}
+              onDeleteNote={handleDeleteNote}
+              initialPlaceType={initialMapFilters?.placeType}
+              initialGovernorates={initialMapFilters?.governorates}
+              initialCities={initialMapFilters?.cities}
             />
           </motion.div>
         )}
@@ -256,29 +328,131 @@ export default function MasarApp() {
                 onComplete={handleCompleteJourney}
                 isComplete={isJourneyComplete}
                 stats={journeyStats}
+                visits={visits}
+                onAddNote={handleAddNote}
+                onDeleteNote={handleDeleteNote}
+                onAddNewPlace={handleAddNewPlace}
               />
             ) : (
-              <div className="h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-b from-background to-muted/30">
+              <div className="h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-b from-background to-muted/30 relative overflow-hidden">
+                {/* Decorative background elements */}
+                <motion.div
+                  className="absolute top-20 left-10 w-2 h-2 rounded-full bg-primary/20"
+                  animate={{
+                    y: [0, -20, 0],
+                    opacity: [0.3, 0.6, 0.3],
+                    scale: [1, 1.2, 1],
+                  }}
+                  transition={{
+                    duration: 3,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                  }}
+                />
+                <motion.div
+                  className="absolute top-32 right-16 w-3 h-3 rounded-full bg-primary/15"
+                  animate={{
+                    y: [0, 15, 0],
+                    opacity: [0.2, 0.5, 0.2],
+                    scale: [1, 1.3, 1],
+                  }}
+                  transition={{
+                    duration: 4,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                    delay: 0.5,
+                  }}
+                />
+                <motion.div
+                  className="absolute bottom-32 left-20 w-2.5 h-2.5 rounded-full bg-primary/25"
+                  animate={{
+                    y: [0, -15, 0],
+                    opacity: [0.3, 0.7, 0.3],
+                    scale: [1, 1.4, 1],
+                  }}
+                  transition={{
+                    duration: 3.5,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                    delay: 1,
+                  }}
+                />
+
                 <motion.div
                   initial={{ scale: 0.9, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  transition={{ duration: 0.2, ease: 'easeOut' }}
-                  className="text-center"
+                  transition={{ duration: 0.4, ease: [0.2, 0, 0, 1] }}
+                  className="text-center max-w-sm mx-auto relative z-10 flex flex-col items-center"
                   style={{ willChange: 'transform, opacity' }}
                 >
-                  <div className="w-32 h-32 mx-auto mb-6 gradient-primary rounded-3xl flex items-center justify-center shadow-elevated">
-                    <Car className="w-16 h-16 text-white" />
-                  </div>
-                  <h2 className="text-2xl font-bold mb-2">لا توجد رحلة نشطة</h2>
-                  <p className="text-muted-foreground mb-6 max-w-xs mx-auto">
-                    روح لصفحة التجهيز واختار الأماكن اللي عايز تزورها النهاردة
-                  </p>
-                  <button
-                    onClick={() => setActiveTab('plan')}
-                    className="gradient-primary text-white px-8 py-4 rounded-full font-semibold shadow-elevated"
+                  {/* Main icon with floating animation */}
+                  <motion.div
+                    initial={{ scale: 0.8, opacity: 0, rotate: -10 }}
+                    animate={{ 
+                      scale: 1, 
+                      opacity: 1, 
+                      rotate: 0,
+                      y: [0, -8, 0],
+                    }}
+                    transition={{ 
+                      delay: 0.1, 
+                      duration: 0.4, 
+                      ease: [0.2, 0, 0, 1],
+                      y: {
+                        duration: 3,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                      }
+                    }}
+                    className="relative mx-auto mb-8 flex items-center justify-center"
+                    style={{ width: '112px', height: '112px' }}
                   >
-                    جهّز رحلتك
-                  </button>
+                    <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center backdrop-blur-sm border border-primary/10 shadow-[0_8px_32px_rgba(74,144,217,0.15)] absolute inset-0">
+                      <Car className="w-14 h-14 text-primary" strokeWidth={1.5} />
+                    </div>
+                  </motion.div>
+
+   
+
+                  <motion.h2
+                    initial={{ y: 15, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.25, duration: 0.4, ease: 'easeOut' }}
+                    className="text-2xl font-bold mb-4 text-foreground"
+                  >
+                    لا توجد رحلة نشطة
+                  </motion.h2>
+                  
+                  <motion.p
+                    initial={{ y: 15, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.35, duration: 0.4, ease: 'easeOut' }}
+                    className="text-base text-muted-foreground mb-10 leading-relaxed px-4"
+                  >
+                    روح لصفحة التجهيز واختار الأماكن اللي عايز تزورها النهاردة
+                  </motion.p>
+                  
+                  <motion.button
+                    initial={{ y: 15, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.45, duration: 0.4, ease: 'easeOut' }}
+                    whileHover={{ scale: 1.05, y: -2 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setActiveTab('plan')}
+                    className="group relative gradient-primary text-white px-8 py-4 rounded-2xl font-semibold text-base shadow-[0_8px_24px_rgba(74,144,217,0.4)] hover:shadow-[0_12px_32px_rgba(74,144,217,0.5)] transition-all flex items-center gap-2 mx-auto"
+                  >
+                    <span>جهّز رحلتك</span>
+                    <motion.div
+                      animate={{ x: [0, 4, 0] }}
+                      transition={{
+                        duration: 1.5,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                      }}
+                    >
+                      <ArrowRight className="w-5 h-5" strokeWidth={2.5} />
+                    </motion.div>
+                  </motion.button>
                 </motion.div>
               </div>
             )}
@@ -297,6 +471,12 @@ export default function MasarApp() {
             <HistoryScreen 
               visits={visits} 
               onNavigateToPlan={() => setActiveTab('plan')}
+              places={places}
+              onPlaceSelect={setSelectedPlace}
+              userLocation={userLocation}
+              onAddNote={handleAddNote}
+              onDeleteNote={handleDeleteNote}
+              onTogglePlace={handleTogglePlace}
             />
           </motion.div>
         )}

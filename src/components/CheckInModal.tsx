@@ -8,12 +8,15 @@ import { getPlaceIcon } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { BottomSheet } from '@/components/bottom-sheet';
+import { AddPlaceSheet } from '@/components/AddPlaceSheet';
 
 interface CheckInModalProps {
   place: Place;
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (outcome: VisitOutcome, notes: string, rating?: number) => void;
+  onAddNewPlace?: (place: Omit<Place, 'id' | 'createdAt'>) => void;
+  userLocation?: { lat: number; lng: number } | null;
 }
 
 const outcomes: { id: VisitOutcome; label: string; icon: typeof Check; color: string; lightColor: string; bg: string }[] = [
@@ -25,12 +28,13 @@ const outcomes: { id: VisitOutcome; label: string; icon: typeof Check; color: st
 
 const resultOptions = ['تم البيع', 'مهتم', 'غير مهتم'];
 
-export function CheckInModal({ place, isOpen, onClose, onSubmit }: CheckInModalProps) {
+export function CheckInModal({ place, isOpen, onClose, onSubmit, onAddNewPlace, userLocation }: CheckInModalProps) {
   const [selectedOutcome, setSelectedOutcome] = useState<VisitOutcome | null>(null);
   const [notes, setNotes] = useState('');
   const [rating, setRating] = useState(0);
   const [selectedResult, setSelectedResult] = useState<string | null>(null);
   const [hoverRating, setHoverRating] = useState(0);
+  const [isAddPlaceOpen, setIsAddPlaceOpen] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
@@ -38,8 +42,16 @@ export function CheckInModal({ place, isOpen, onClose, onSubmit }: CheckInModalP
       setNotes('');
       setRating(0);
       setSelectedResult(null);
+      setIsAddPlaceOpen(false);
     }
   }, [isOpen]);
+
+  const handleAddNewPlace = (newPlace: Omit<Place, 'id' | 'createdAt'>) => {
+    if (onAddNewPlace) {
+      onAddNewPlace(newPlace);
+      setIsAddPlaceOpen(false);
+    }
+  };
 
   const handleSubmit = () => {
     if (selectedOutcome) {
@@ -79,7 +91,7 @@ export function CheckInModal({ place, isOpen, onClose, onSubmit }: CheckInModalP
           </div>
           <motion.button
             whileTap={{ scale: 0.95 }}
-            onClick={onClose}
+            onClick={() => setIsAddPlaceOpen(true)}
             className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all border-2 border-dotted text-foreground hover:opacity-80 shrink-0"
             style={{
               borderColor: 'rgba(74, 144, 217, 0.3)',
@@ -254,6 +266,13 @@ export function CheckInModal({ place, isOpen, onClose, onSubmit }: CheckInModalP
           حفظ والمتابعة
         </Button>
       </div>
+
+      <AddPlaceSheet
+        isOpen={isAddPlaceOpen}
+        onClose={() => setIsAddPlaceOpen(false)}
+        onSave={handleAddNewPlace}
+        userLocation={userLocation || null}
+      />
     </BottomSheet>
   );
 }

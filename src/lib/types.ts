@@ -38,6 +38,7 @@ export interface Visit {
   notes?: string;
   rating?: number;
   soldItems?: string;
+  isManualNote?: boolean; // Indicates if this note was added manually (not from a visit)
 }
 
 export interface Journey {

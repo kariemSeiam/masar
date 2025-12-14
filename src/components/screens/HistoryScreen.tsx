@@ -2,17 +2,24 @@
 
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronRight, ChevronLeft, CheckCircle, Calendar, XCircle, Clock, Star, BarChart3, FileText, Filter, Map as MapIcon } from 'lucide-react';
-import { Visit } from '@/lib/types';
+import { ChevronRight, ChevronLeft, CheckCircle, Calendar, XCircle, Clock, Star, BarChart3, FileText, Filter, Map as MapIcon, PenSquare } from 'lucide-react';
+import { Visit, Place } from '@/lib/types';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfDay, endOfDay, isWithinInterval, isSameDay, isSameMonth, isSameWeek } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
+import { PlaceDetailsSheet } from '@/components/PlaceDetailsSheet';
 
 interface HistoryScreenProps {
   visits: Visit[];
   onNavigateToPlan?: () => void;
+  places?: Place[];
+  onPlaceSelect?: (place: Place | null) => void;
+  userLocation?: { lat: number; lng: number } | null;
+  onAddNote?: (placeId: string, note: string) => void;
+  onDeleteNote?: (visitId: string) => void;
+  onTogglePlace?: (place: Place) => void;
 }
 
 const outcomeIcons: Record<string, { icon: typeof CheckCircle; color: string; bg: string }> = {
@@ -24,11 +31,21 @@ const outcomeIcons: Record<string, { icon: typeof CheckCircle; color: string; bg
 
 type FilterType = 'all' | 'today' | 'week' | 'month' | 'custom';
 
-export function HistoryScreen({ visits, onNavigateToPlan }: HistoryScreenProps) {
+export function HistoryScreen({ 
+  visits, 
+  onNavigateToPlan,
+  places = [],
+  onPlaceSelect,
+  userLocation,
+  onAddNote,
+  onDeleteNote,
+  onTogglePlace,
+}: HistoryScreenProps) {
   const [filterType, setFilterType] = useState<FilterType>('all');
   const [baseDate, setBaseDate] = useState<Date>(new Date()); // Base date for navigation
   const [customDateRange, setCustomDateRange] = useState<{from?: Date; to?: Date} | undefined>({from: new Date(), to: new Date()});
   const [showCustomPicker, setShowCustomPicker] = useState(false);
+  const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
 
   // Calculate date range based on filter type
   const dateRange = useMemo(() => {
@@ -191,7 +208,12 @@ export function HistoryScreen({ visits, onNavigateToPlan }: HistoryScreenProps) 
         <div className="px-4 pl-0 py-3">
           {/* Title and View Mode Toggle */}
           <div className="flex items-center justify-between mb-3 ml-4">
-            <h1 className="text-lg font-bold text-right leading-tight">السجل</h1>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                <Calendar className="w-5 h-5 text-primary" strokeWidth={2} />
+              </div>
+              <h1 className="text-lg font-bold text-right leading-tight">السجل</h1>
+            </div>
             <button
               onClick={() => onNavigateToPlan?.()}
               className="w-12 h-12 rounded-full bg-primary/10 hover:bg-primary/20 text-primary flex items-center justify-center transition-colors shrink-0"
@@ -389,21 +411,34 @@ export function HistoryScreen({ visits, onNavigateToPlan }: HistoryScreenProps) 
             ) : (
               filteredVisits.map((visit, index) => {
                 const outcomeInfo = outcomeIcons[visit.outcome];
+                const place = places.find(p => p.id === visit.placeId);
+                const isManualNote = visit.isManualNote === true;
                 return (
                   <motion.div
                     key={visit.id}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.05 }}
-                    className="bg-card rounded-xl p-4 shadow-soft" dir='rtl'
+                    className="bg-card rounded-xl p-4 shadow-soft cursor-pointer hover:bg-muted/50 transition-colors" 
+                    dir='rtl'
+                    onClick={() => {
+                      if (place) {
+                        setSelectedPlace(place);
+                        onPlaceSelect?.(place);
+                      }
+                    }}
                   >
                     <div className="flex items-start gap-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          {(() => {
-                            const Icon = outcomeInfo.icon;
-                            return <Icon className="w-4 h-4 shrink-0" style={{ color: outcomeInfo.color }} />;
-                          })()}
+                          {isManualNote ? (
+                            <PenSquare className="w-4 h-4 shrink-0 text-purple-500 dark:text-purple-400" />
+                          ) : (
+                            (() => {
+                              const Icon = outcomeInfo.icon;
+                              return <Icon className="w-4 h-4 shrink-0" style={{ color: outcomeInfo.color }} />;
+                            })()
+                          )}
                           <h3 className="font-semibold">{visit.placeName}</h3>
                         </div>
 
@@ -444,6 +479,25 @@ export function HistoryScreen({ visits, onNavigateToPlan }: HistoryScreenProps) 
           </div>
         </div>
       </div>
+
+      {/* PlaceDetailsSheet */}
+      {selectedPlace && (
+        <PlaceDetailsSheet
+          place={selectedPlace}
+          isOpen={!!selectedPlace}
+          onClose={() => {
+            setSelectedPlace(null);
+            onPlaceSelect?.(null);
+          }}
+          userLocation={userLocation}
+          visits={visits}
+          isInJourney={false}
+          onAddToJourney={selectedPlace && onTogglePlace ? () => onTogglePlace(selectedPlace) : undefined}
+          onRemoveFromJourney={undefined}
+          onAddNote={selectedPlace && onAddNote ? (note: string) => onAddNote(selectedPlace.id, note) : undefined}
+          onDeleteNote={onDeleteNote}
+        />
+      )}
     </div>
   );
 }

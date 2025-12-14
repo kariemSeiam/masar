@@ -7,8 +7,10 @@ import { Place, VisitOutcome } from '@/lib/types';
 import { MapView } from '@/components/MapView';
 import { CheckInModal } from '@/components/CheckInModal';
 import { JourneyComplete } from '@/components/JourneyComplete';
+import { PlaceDetailsSheet } from '@/components/PlaceDetailsSheet';
 import { Button } from '@/components/ui/button';
 import { getPlaceIcon, calculateDistance, formatDistance, formatDuration } from '@/lib/store';
+import { Visit } from '@/lib/types';
 
 interface JourneyScreenProps {
   places: Place[];
@@ -24,6 +26,10 @@ interface JourneyScreenProps {
     closed: number;
     duration: string;
   };
+  visits?: Visit[];
+  onAddNote?: (placeId: string, note: string) => void;
+  onDeleteNote?: (visitId: string) => void;
+  onAddNewPlace?: (place: Omit<Place, 'id' | 'createdAt'>) => void;
 }
 
 export function JourneyScreen({
@@ -35,8 +41,13 @@ export function JourneyScreen({
   onComplete,
   isComplete,
   stats,
+  visits = [],
+  onAddNote,
+  onDeleteNote,
+  onAddNewPlace,
 }: JourneyScreenProps) {
   const [isCheckInOpen, setIsCheckInOpen] = useState(false);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const currentPlace = places[currentIndex];
@@ -113,6 +124,7 @@ export function JourneyScreen({
         className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl z-10"
       >
         <motion.button
+          onClick={handleOpenInMaps}
           className="absolute start-4 -top-18 z-9999 h-14 w-14 rounded-full flex items-center justify-center font-semibold text-white transition-all bg-primary shadow-[0_8px_24px_rgba(74,144,217,0.4),0_4px_12px_rgba(74,144,217,0.3)] hover:shadow-[0_12px_32px_rgba(74,144,217,0.5),0_6px_16px_rgba(74,144,217,0.4)] hover:bg-primary/95 active:scale-95"
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
@@ -172,7 +184,11 @@ export function JourneyScreen({
             )}
 
             {/* Place Info with Chips */}
-            <div className="flex items-center gap-3">
+            <motion.div
+              className="flex items-center gap-3 cursor-pointer"
+              onClick={() => setIsDetailsOpen(true)}
+              whileTap={{ scale: 0.98 }}
+            >
               <div className="w-12 h-12 gradient-primary rounded-xl flex items-center justify-center shrink-0">
                 {getPlaceIcon(currentPlace.type, 'w-6 h-6', 'primary')}
               </div>
@@ -249,7 +265,7 @@ export function JourneyScreen({
                   </div>
                 )}
               </div>
-            </div>
+            </motion.div>
 
             {/* Action Buttons */}
             <div className="flex items-center gap-2 justify-between pt-1">
@@ -304,6 +320,19 @@ export function JourneyScreen({
         isOpen={isCheckInOpen}
         onClose={() => setIsCheckInOpen(false)}
         onSubmit={handleCheckInSubmit}
+        onAddNewPlace={onAddNewPlace}
+        userLocation={userLocation}
+      />
+
+      <PlaceDetailsSheet
+        place={currentPlace}
+        isOpen={isDetailsOpen}
+        onClose={() => setIsDetailsOpen(false)}
+        userLocation={userLocation}
+        visits={visits}
+        isInJourney={true}
+        onAddNote={onAddNote ? (note: string) => onAddNote(currentPlace.id, note) : undefined}
+        onDeleteNote={onDeleteNote}
       />
     </div>
   );

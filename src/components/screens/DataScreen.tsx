@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, ChevronDown, ChevronUp, MapPin, Phone, Star, Download, Settings, BarChart3, Rocket, Sun, Moon, Database, Search, X, ChevronDownIcon, Tag, Clock, CheckCircle2, Sparkles, Zap, TrendingUp } from 'lucide-react';
+import { Plus, ChevronDown, ChevronUp, MapPin, Phone, Star, Download, Settings, BarChart3, Rocket, Sun, Moon, Database, Search, X, ChevronDownIcon, Tag, Clock, CheckCircle2, Sparkles, Zap, TrendingUp, Map } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { PLACE_TYPES, GOVERNORATES, CITIES } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,7 @@ import {
 
 interface DataScreenProps {
   availableData: { type: string; count: number; cities?: string[]; governorates?: string[] }[];
+  onAddToMap?: (type: string, cities: string[], governorates: string[]) => void;
 }
 
 interface Order {
@@ -34,7 +35,7 @@ interface Order {
   status: 'pending' | 'processing' | 'completed';
 }
 
-export function DataScreen({ availableData }: DataScreenProps) {
+export function DataScreen({ availableData, onAddToMap }: DataScreenProps) {
   const [isAvailableDataExpanded, setIsAvailableDataExpanded] = useState(true);
   const [isNewDataExpanded, setIsNewDataExpanded] = useState(false);
   const [isOrdersExpanded, setIsOrdersExpanded] = useState(true);
@@ -44,6 +45,10 @@ export function DataScreen({ availableData }: DataScreenProps) {
   const [selectedCities, setSelectedCities] = useState<string[]>([]);
   const [governorateSearch, setGovernorateSearch] = useState<string>('');
   const [citySearch, setCitySearch] = useState<string>('');
+  const [isGovernorateInputEditable, setIsGovernorateInputEditable] = useState(false);
+  const [isCityInputEditable, setIsCityInputEditable] = useState(false);
+  const governorateInputRef = useRef<HTMLInputElement>(null);
+  const cityInputRef = useRef<HTMLInputElement>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
   const [deleteCityDialog, setDeleteCityDialog] = useState<{ open: boolean; orderId: string; city: string; governorate: string } | null>(null);
@@ -540,24 +545,43 @@ export function DataScreen({ availableData }: DataScreenProps) {
                 >
                 {availableData.map((data, index) => {
                   const typeInfo = PLACE_TYPES.find(t => t.value === data.type);
+                  const handleAddToMap = (e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    if (onAddToMap && data.cities && data.governorates) {
+                      onAddToMap(data.type, data.cities, data.governorates);
+                    }
+                  };
+                  
                   return (
-                    <motion.button
+                    <motion.div
                       key={data.type}
                       initial={{ opacity: 0, x: 20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.1 }}
-                      onClick={() => handleAvailableDataClick(data.type)}
-                      className="w-full flex items-center justify-between py-3 px-4 bg-muted/50 rounded-xl hover:bg-muted/70 transition-colors text-right"
+                      className="w-full flex items-center gap-3 py-3 px-4 bg-muted/50 rounded-xl hover:bg-muted/70 transition-colors"
                     >
-                      <div className="flex items-center gap-3">
-                        {typeInfo?.icon || <MapPin className="w-5 h-5 text-primary" />}
-                        <span className="font-medium">{typeInfo?.label || data.type}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <MapPin className="w-4 h-4" />
-                        <span>{data.count} مكان</span>
-                      </div>
-                    </motion.button>
+                      <button
+                        onClick={() => handleAvailableDataClick(data.type)}
+                        className="flex-1 flex items-center justify-between text-right"
+                      >
+                        <div className="flex items-center gap-3">
+                          {typeInfo?.icon || <MapPin className="w-5 h-5 text-primary" />}
+                          <div className="flex flex-col items-start">
+                            <span className="font-medium">{typeInfo?.label || data.type}</span>
+                            <span className="text-xs text-muted-foreground">{data.count} مكان</span>
+                          </div>
+                        </div>
+                      </button>
+                      {onAddToMap && data.cities && data.governorates && (
+                        <button
+                          onClick={handleAddToMap}
+                          className="w-10 h-10 flex items-center justify-center rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-colors shrink-0"
+                          title="إضافة إلى الخريطة"
+                        >
+                          <Map className="w-5 h-5" />
+                        </button>
+                      )}
+                    </motion.div>
                   );
                 })}
 
@@ -656,7 +680,15 @@ export function DataScreen({ availableData }: DataScreenProps) {
               <div className="space-y-3">
                 <label className="text-sm font-medium text-muted-foreground">المنطقة</label>
                 <div className="flex gap-2 mt-2">
-                  <Popover>
+                  <Popover onOpenChange={(open) => {
+                    if (!open) {
+                      setIsGovernorateInputEditable(false);
+                      setGovernorateSearch('');
+                      if (governorateInputRef.current) {
+                        governorateInputRef.current.blur();
+                      }
+                    }
+                  }}>
                     <PopoverTrigger asChild>
                       <button 
                         type="button"
@@ -674,15 +706,30 @@ export function DataScreen({ availableData }: DataScreenProps) {
                         <ChevronDownIcon className="w-4 h-4 opacity-50" />
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-(--radix-popover-trigger-width) p-2" align="start">
+                    <PopoverContent 
+                      className="w-(--radix-popover-trigger-width) p-2" 
+                      align="start"
+                      onOpenAutoFocus={(e) => {
+                        e.preventDefault();
+                        if (governorateInputRef.current) {
+                          governorateInputRef.current.blur();
+                        }
+                      }}
+                    >
                       <div className="mb-2">
                         <div className="relative">
                           <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                           <input
+                            ref={governorateInputRef}
                             type="text"
                             placeholder="ابحث..."
                             value={governorateSearch}
                             onChange={(e) => setGovernorateSearch(e.target.value)}
+                            onClick={() => setIsGovernorateInputEditable(true)}
+                            onFocus={() => setIsGovernorateInputEditable(true)}
+                            readOnly={!isGovernorateInputEditable}
+                            inputMode={isGovernorateInputEditable ? "text" : "none"}
+                            tabIndex={isGovernorateInputEditable ? 0 : -1}
                             className="w-full pr-9 pl-3 py-2 text-sm bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
                             dir="rtl"
                           />
@@ -711,7 +758,15 @@ export function DataScreen({ availableData }: DataScreenProps) {
                     </PopoverContent>
                   </Popover>
 
-                  <Popover>
+                  <Popover onOpenChange={(open) => {
+                    if (!open) {
+                      setIsCityInputEditable(false);
+                      setCitySearch('');
+                      if (cityInputRef.current) {
+                        cityInputRef.current.blur();
+                      }
+                    }
+                  }}>
                     <PopoverTrigger asChild>
                       <button 
                         type="button"
@@ -730,15 +785,30 @@ export function DataScreen({ availableData }: DataScreenProps) {
                         <ChevronDownIcon className="w-4 h-4 opacity-50" />
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-(--radix-popover-trigger-width) p-2" align="start">
+                    <PopoverContent 
+                      className="w-(--radix-popover-trigger-width) p-2" 
+                      align="start"
+                      onOpenAutoFocus={(e) => {
+                        e.preventDefault();
+                        if (cityInputRef.current) {
+                          cityInputRef.current.blur();
+                        }
+                      }}
+                    >
                       <div className="mb-2">
                         <div className="relative">
                           <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                           <input
+                            ref={cityInputRef}
                             type="text"
                             placeholder="ابحث..."
                             value={citySearch}
                             onChange={(e) => setCitySearch(e.target.value)}
+                            onClick={() => setIsCityInputEditable(true)}
+                            onFocus={() => setIsCityInputEditable(true)}
+                            readOnly={!isCityInputEditable}
+                            inputMode={isCityInputEditable ? "text" : "none"}
+                            tabIndex={isCityInputEditable ? 0 : -1}
                             className="w-full pr-9 pl-3 py-2 text-sm bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
                             dir="rtl"
                           />
