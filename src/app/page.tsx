@@ -17,6 +17,7 @@ import { BottomSheetProvider } from '@/lib/bottom-sheet-context';
 type TabId = 'data' | 'plan' | 'journey' | 'history';
 
 export default function MasarApp() {
+  const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('plan');
   const [places, setPlaces] = useState<Place[]>(mockPlaces);
   const [visits, setVisits] = useState<Visit[]>(mockVisits);
@@ -43,6 +44,10 @@ export default function MasarApp() {
     governorates?: string[];
     cities?: string[];
   } | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && navigator.geolocation) {
@@ -252,6 +257,10 @@ export default function MasarApp() {
       governorates: Array.from(governorates),
     })).filter((d) => d.count > 0);
   }, [places]);
+
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <BottomSheetProvider>
