@@ -43,8 +43,10 @@ export function AddPlaceSheet({ isOpen, onClose, onSave, userLocation }: AddPlac
   }, [isOpen, userLocation]);
 
   const handleGetCurrentLocation = useCallback(() => {
-    if (!navigator.geolocation) {
-      alert('المتصفح لا يدعم تحديد الموقع');
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      if (typeof window !== 'undefined') {
+        alert('المتصفح لا يدعم تحديد الموقع');
+      }
       return;
     }
 
