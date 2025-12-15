@@ -13,6 +13,7 @@ export interface Place {
   id: string;
   name: string;
   type: PlaceType;
+  customType?: string; // Custom type name when type is 'other'
   governorate: string;
   city: string;
   address?: string;
@@ -96,4 +97,11 @@ export const STATUS_LABELS: Record<PlaceStatus, string> = {
   closed: 'مغلق',
   not_found: 'غير موجود',
 };
+
+export interface User {
+  id: string;
+  phone: string;
+  name: string;
+  createdAt: string; // ISO string
+}
 

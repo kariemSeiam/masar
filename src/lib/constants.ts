@@ -8,8 +8,8 @@ export const ANIMATION_DURATION = 0.15;
 export const MAP_UPDATE_DEBOUNCE = 100;
 
 // Journey constants
-export const ESTIMATED_TIME_PER_KM = 3; // minutes per kilometer
+export const ESTIMATED_TIME_PER_KM = 3; // minutes per kilometer (same as MINUTES_PER_KM in timing.ts)
 
-// UI constants
-export const COPY_FEEDBACK_DURATION = 2000; // milliseconds
+// Re-export timing constants for backward compatibility
+export { COPY_FEEDBACK_DURATION } from './constants/timing';
 
