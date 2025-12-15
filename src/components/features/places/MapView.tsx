@@ -12,6 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { MapContainer, TileLayer, Marker, Circle, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { LEAFLET_CDN_BASE } from '@/lib/constants/urls';
 
 interface MapViewProps {
   places: Place[];
@@ -29,6 +30,9 @@ interface MapViewProps {
   onPlaceTypeChange?: (placeType: string | null) => void;
   onGovernoratesChange?: (governorates: string[]) => void;
   onCitiesChange?: (cities: string[]) => void;
+  initialPlaceType?: string | null;
+  initialGovernorates?: string[];
+  initialCities?: string[];
 }
 
 // Map center updater component (must be outside to avoid hooks order issues)
@@ -274,19 +278,112 @@ export function MapView({
   onPlaceTypeChange,
   onGovernoratesChange,
   onCitiesChange,
+  initialPlaceType,
+  initialGovernorates,
+  initialCities,
 }: MapViewProps) {
   const mapRef = useRef<L.Map | null>(null);
   const [mapCenter] = useState<[number, number]>([30.5877, 31.5020]);
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  const [selectedPlaceTypes, setSelectedPlaceTypes] = useState<string[]>([]);
+  const [selectedPlaceTypes, setSelectedPlaceTypes] = useState<string[]>(
+    initialPlaceType ? [initialPlaceType] : []
+  );
   const [showPlaceTypeSelector, setShowPlaceTypeSelector] = useState(false);
   const [showGovernoratesDropdown, setShowGovernoratesDropdown] = useState(false);
   const [showCitiesDropdown, setShowCitiesDropdown] = useState(false);
   const [governorateSearch, setGovernorateSearch] = useState<string>('');
   const [citySearch, setCitySearch] = useState<string>('');
-  const [tempSelectedGovernorates, setTempSelectedGovernorates] = useState<string[]>(selectedGovernorates);
-  const [tempSelectedCities, setTempSelectedCities] = useState<string[]>(selectedCities);
+  const [tempSelectedGovernorates, setTempSelectedGovernorates] = useState<string[]>(
+    initialGovernorates || selectedGovernorates
+  );
+  const [tempSelectedCities, setTempSelectedCities] = useState<string[]>(
+    initialCities || selectedCities
+  );
+
+  // Apply initial values when they change
+  // Don't clear filters when initial values become null/undefined
+  const prevInitialValues = useRef<{ placeType?: string | null; governorates?: string[]; cities?: string[] } | null>(null);
+  const hasAppliedInitialValues = useRef(false);
+  
+  useEffect(() => {
+    // Only apply when values are provided (not null/undefined/empty)
+    // Don't clear filters when initial values become null
+    const shouldUpdatePlaceType = initialPlaceType && (
+      !hasAppliedInitialValues.current || 
+      prevInitialValues.current?.placeType !== initialPlaceType
+    );
+    const shouldUpdateGovernorates = initialGovernorates && initialGovernorates.length > 0 && (
+      !hasAppliedInitialValues.current || 
+      JSON.stringify(prevInitialValues.current?.governorates) !== JSON.stringify(initialGovernorates)
+    );
+    const shouldUpdateCities = initialCities && initialCities.length > 0 && (
+      !hasAppliedInitialValues.current || 
+      JSON.stringify(prevInitialValues.current?.cities) !== JSON.stringify(initialCities)
+    );
+    
+    if (shouldUpdatePlaceType || shouldUpdateGovernorates || shouldUpdateCities) {
+      if (shouldUpdatePlaceType) {
+        // Parse comma-separated place types if present
+        const placeTypes = initialPlaceType.includes(',') 
+          ? initialPlaceType.split(',').filter(Boolean)
+          : [initialPlaceType];
+        setSelectedPlaceTypes(placeTypes);
+        
+        // Use initialCities and initialGovernorates if provided
+        if (initialCities && initialCities.length > 0 && initialGovernorates && initialGovernorates.length > 0) {
+          // Use the provided cities and governorates directly
+          setTempSelectedGovernorates(initialGovernorates);
+          setTempSelectedCities(initialCities);
+          // Don't call onChange here to avoid infinite loops - these are already applied
+        } else {
+          // Auto-select cities and governorates that have data for the selected place type(s)
+          const allCities = new Set<string>();
+          const allGovernorates = new Set<string>();
+          
+          placeTypes.forEach(type => {
+            const dataItem = availableData.find(d => d.type === type);
+            if (dataItem?.cities) {
+              dataItem.cities.forEach(city => {
+                allCities.add(city);
+                // Find governorate for city
+                for (const [gov, govCities] of Object.entries(CITIES)) {
+                  if (govCities.includes(city)) {
+                    allGovernorates.add(gov);
+                    break;
+                  }
+                }
+              });
+            }
+            // Also add governorates directly if available
+            if (dataItem?.governorates) {
+              dataItem.governorates.forEach(gov => allGovernorates.add(gov));
+            }
+          });
+          
+          if (allCities.size > 0) {
+            const governoratesArray = Array.from(allGovernorates);
+            const citiesArray = Array.from(allCities);
+            setTempSelectedGovernorates(governoratesArray);
+            setTempSelectedCities(citiesArray);
+            // Don't call onChange here to avoid infinite loops - these are already applied
+          }
+        }
+      }
+      if (shouldUpdateGovernorates && !shouldUpdatePlaceType) {
+        setTempSelectedGovernorates(initialGovernorates);
+        onGovernoratesChange?.(initialGovernorates);
+      }
+      if (shouldUpdateCities && !shouldUpdatePlaceType) {
+        setTempSelectedCities(initialCities);
+        onCitiesChange?.(initialCities);
+      }
+      prevInitialValues.current = { placeType: initialPlaceType, governorates: initialGovernorates, cities: initialCities };
+      hasAppliedInitialValues.current = true;
+    }
+    // Don't clear filters when initial values become null/undefined
+    // Filters should persist even after initialMapFilters is cleared
+  }, [initialPlaceType, initialGovernorates, initialCities, availableData, onGovernoratesChange, onCitiesChange]);
 
   useEffect(() => {
     setMounted(true);
@@ -295,9 +392,9 @@ export function MapView({
     if (typeof window !== 'undefined') {
       delete (L.Icon.Default.prototype as any)._getIconUrl;
       L.Icon.Default.mergeOptions({
-        iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-        iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+        iconRetinaUrl: `${LEAFLET_CDN_BASE}/marker-icon-2x.png`,
+        iconUrl: `${LEAFLET_CDN_BASE}/marker-icon.png`,
+        shadowUrl: `${LEAFLET_CDN_BASE}/marker-shadow.png`,
       });
     }
   }, []);
@@ -403,37 +500,50 @@ export function MapView({
         setTempSelectedGovernorates([]);
         setTempSelectedCities([]);
         onPlaceTypeChange?.(null);
+        onGovernoratesChange?.([]);
+        onCitiesChange?.([]);
       } else {
-        // Recalculate based on remaining place types
-        const allCities = new Set<string>();
-        const allGovernorates = new Set<string>();
+        // Recalculate cities and governorates for remaining selected types
+        const availableCities = new Set<string>();
+        const availableGovernorates = new Set<string>();
         
         newSelected.forEach(type => {
           const dataItem = availableData.find(d => d.type === type);
           if (dataItem?.cities) {
             dataItem.cities.forEach(city => {
-              allCities.add(city);
+              availableCities.add(city);
               // Find governorate for city
               for (const [gov, govCities] of Object.entries(CITIES)) {
                 if (govCities.includes(city)) {
-                  allGovernorates.add(gov);
+                  availableGovernorates.add(gov);
                   break;
                 }
               }
             });
           }
+          // Also add governorates directly if available
+          if (dataItem?.governorates) {
+            dataItem.governorates.forEach(gov => availableGovernorates.add(gov));
+          }
         });
         
-        setTempSelectedGovernorates(Array.from(allGovernorates));
-        setTempSelectedCities(Array.from(allCities));
+        // Update to only include cities/governorates available for remaining types
+        const newGovernorates = Array.from(availableGovernorates);
+        const newCities = Array.from(availableCities);
+        setTempSelectedGovernorates(newGovernorates);
+        setTempSelectedCities(newCities);
+        
+        // Automatically apply the updated selections
         onPlaceTypeChange?.(newSelected.join(','));
+        onGovernoratesChange?.(newGovernorates);
+        onCitiesChange?.(newCities);
       }
     } else {
       // Select
       const newSelected = [...selectedPlaceTypes, placeType];
       setSelectedPlaceTypes(newSelected);
       
-      // Merge cities and governorates from all selected types
+      // Auto-select cities and governorates that have data for the selected place type(s)
       const allCities = new Set<string>();
       const allGovernorates = new Set<string>();
       
@@ -457,9 +567,16 @@ export function MapView({
         }
       });
       
-      setTempSelectedGovernorates(Array.from(allGovernorates));
-      setTempSelectedCities(Array.from(allCities));
+      // Set temp selections to all available cities/governorates for the selected type(s)
+      const newGovernorates = Array.from(allGovernorates);
+      const newCities = Array.from(allCities);
+      setTempSelectedGovernorates(newGovernorates);
+      setTempSelectedCities(newCities);
+      
+      // Automatically apply the selections so places load immediately
       onPlaceTypeChange?.(newSelected.join(','));
+      onGovernoratesChange?.(newGovernorates);
+      onCitiesChange?.(newCities);
     }
   };
 
@@ -682,11 +799,8 @@ export function MapView({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (availableData.length > 0) {
-                        setShowPlaceTypeSelector(true);
-                      } else {
-                        onLocationEdit?.();
-                      }
+                      // Open place type selector
+                      setShowPlaceTypeSelector(true);
                     }}
                     className={`flex items-center gap-2 text-sm font-medium text-muted-foreground bg-muted/50 hover:bg-muted hover:text-foreground px-3 py-2 rounded-xl transition-colors cursor-pointer max-w-[200px] justify-between group shrink-0 ${
                       selectedCities.length === 0 && selectedGovernorates.length === 0
@@ -696,10 +810,12 @@ export function MapView({
                   >
                     <span className="text-right truncate">
                       {selectedPlaceTypes.length > 0 ? (() => {
-                        const typeLabels = selectedPlaceTypes.map(type => {
-                          const typeInfo = PLACE_TYPES.find(t => t.value === type);
-                          return typeInfo?.label || type;
-                        }).join('، ');
+                        const typeLabels = selectedPlaceTypes.length === 1
+                          ? (() => {
+                              const typeInfo = PLACE_TYPES.find(t => t.value === selectedPlaceTypes[0]);
+                              return typeInfo?.label || selectedPlaceTypes[0];
+                            })()
+                          : `${selectedPlaceTypes.length} مكان`;
                         const cityText = selectedCities.length === 0
                           ? 'المدينة'
                           : selectedCities.length === 1
