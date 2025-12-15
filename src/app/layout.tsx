@@ -3,6 +3,7 @@ import { Cairo } from "next/font/google";
 import "./globals.css";
 import { VisualEditsMessenger } from "orchids-visual-edits";
 import { ThemeProvider } from "next-themes";
+import { ErrorBoundaryWrapper } from "@/components/common/ErrorBoundaryWrapper";
 
 const cairo = Cairo({
   variable: "--font-cairo",
@@ -27,7 +28,9 @@ export default function RootLayout({
         style={{ fontFamily: "'Cairo', sans-serif" }}
       >
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
-          {children}
+          <ErrorBoundaryWrapper>
+            {children}
+          </ErrorBoundaryWrapper>
         </ThemeProvider>
         <VisualEditsMessenger />
       </body>

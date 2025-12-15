@@ -3,14 +3,15 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Car, MapPin, Sparkles, ArrowRight } from 'lucide-react';
-import { Place, Visit, VisitOutcome, CITIES } from '@/lib/types';
-import { mockPlaces, mockVisits } from '@/lib/store';
-import { BottomNav } from '@/components/BottomNav';
+import { Place, Visit, VisitOutcome, CITIES } from '@/types';
+import { mockPlaces, mockVisits } from '@/data/mockData';
+import { BottomNav } from '@/components/layout/BottomNav';
+import { DEFAULT_LOCATION, GEOLOCATION_TIMEOUT, GEOLOCATION_MAX_AGE } from '@/lib/constants';
 import { DataScreen } from '@/components/screens/DataScreen';
 import { PlanScreen } from '@/components/screens/PlanScreen';
 import { JourneyScreen } from '@/components/screens/JourneyScreen';
 import { HistoryScreen } from '@/components/screens/HistoryScreen';
-import { BottomSheetProvider } from '@/lib/bottom-sheet-context';
+import { BottomSheetProvider } from '@/contexts/BottomSheetContext';
 
 type TabId = 'data' | 'plan' | 'journey' | 'history';
 
@@ -21,8 +22,8 @@ export default function MasarApp() {
   const [selectedPlaces, setSelectedPlaces] = useState<Place[]>([]);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>({
-    lat: 30.5877,
-    lng: 31.5020,
+    lat: DEFAULT_LOCATION.lat,
+    lng: DEFAULT_LOCATION.lng,
   });
   
   const [isJourneyActive, setIsJourneyActive] = useState(false);
@@ -35,7 +36,7 @@ export default function MasarApp() {
     closed: 0,
     duration: '0 ساعة',
   });
-  const [journeyStartTime, setJourneyStartTime] = useState<Date | null>(null);
+  const [journeyStartTime, setJourneyStartTime] = useState<number | null>(null);
   const [initialMapFilters, setInitialMapFilters] = useState<{
     placeType?: string;
     governorates?: string[];
@@ -43,19 +44,52 @@ export default function MasarApp() {
   } | null>(null);
 
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
-        },
-        () => {
-          setUserLocation({ lat: 30.5877, lng: 31.5020 });
-        }
-      );
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      return;
     }
+
+    let watchId: number | null = null;
+    let timeoutId: NodeJS.Timeout | null = null;
+
+    const handleSuccess = (position: GeolocationPosition) => {
+      setUserLocation({
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+      });
+    };
+
+    const handleError = (error: GeolocationPositionError) => {
+      console.warn('Geolocation error:', error.message);
+      setUserLocation(DEFAULT_LOCATION);
+    };
+
+    const options: PositionOptions = {
+      enableHighAccuracy: true,
+      timeout: GEOLOCATION_TIMEOUT,
+      maximumAge: GEOLOCATION_MAX_AGE,
+    };
+
+    // Try to get current position first
+    navigator.geolocation.getCurrentPosition(handleSuccess, handleError, options);
+
+    // Then watch for position updates
+    watchId = navigator.geolocation.watchPosition(handleSuccess, handleError, options);
+
+    // Fallback timeout
+    timeoutId = setTimeout(() => {
+      if (!userLocation) {
+        setUserLocation(DEFAULT_LOCATION);
+      }
+    }, GEOLOCATION_TIMEOUT);
+
+    return () => {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, []);
 
   // Clear initial map filters after they've been applied (when tab changes to plan)
@@ -84,7 +118,7 @@ export default function MasarApp() {
       setIsJourneyActive(true);
       setJourneyIndex(0);
       setIsJourneyComplete(false);
-      setJourneyStartTime(new Date());
+      setJourneyStartTime(Date.now());
       setJourneyStats({ visited: 0, postponed: 0, closed: 0, duration: '0 ساعة' });
       setActiveTab('journey');
     } else if (isJourneyActive) {
@@ -100,8 +134,8 @@ export default function MasarApp() {
         id: `v${Date.now()}`,
         placeId: currentPlace.id,
         placeName: currentPlace.name,
-        date: new Date(),
-        checkInTime: new Date(),
+        date: new Date().toISOString(),
+        checkInTime: new Date().toISOString(),
         outcome,
         notes,
         rating,
@@ -126,10 +160,8 @@ export default function MasarApp() {
       if (journeyIndex < selectedPlaces.length - 1) {
         setJourneyIndex((prev) => prev + 1);
       } else {
-        const endTime = new Date();
-        const durationMs = journeyStartTime
-          ? endTime.getTime() - journeyStartTime.getTime()
-          : 0;
+        const endTime = Date.now();
+        const durationMs = journeyStartTime ? endTime - journeyStartTime : 0;
         const hours = Math.floor(durationMs / (1000 * 60 * 60));
         const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
         
@@ -149,10 +181,8 @@ export default function MasarApp() {
       setJourneyIndex((prev) => prev + 1);
     } else {
       // Last place skipped - complete the journey
-      const endTime = new Date();
-      const durationMs = journeyStartTime
-        ? endTime.getTime() - journeyStartTime.getTime()
-        : 0;
+      const endTime = Date.now();
+      const durationMs = journeyStartTime ? endTime - journeyStartTime : 0;
       const hours = Math.floor(durationMs / (1000 * 60 * 60));
       const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
       
@@ -181,8 +211,8 @@ export default function MasarApp() {
       id: `v${Date.now()}`,
       placeId: place.id,
       placeName: place.name,
-      date: new Date(),
-      checkInTime: new Date(),
+      date: new Date().toISOString(),
+      checkInTime: new Date().toISOString(),
       outcome: 'visited',
       notes: note,
       isManualNote: true, // Mark as manually added note
@@ -199,7 +229,7 @@ export default function MasarApp() {
     const place: Place = {
       ...newPlace,
       id: `p${Date.now()}`,
-      createdAt: new Date(),
+      createdAt: new Date().toISOString(),
     };
     
     // Add to places list
@@ -492,8 +522,11 @@ export default function MasarApp() {
             planViewMode={planViewMode}
             selectedPlacesCount={selectedPlaces.length}
             onOpenSelectedPlaces={() => {
-              if (typeof window !== 'undefined' && (window as any).openSelectedPlacesSheet) {
-                (window as any).openSelectedPlacesSheet();
+              if (typeof window !== 'undefined') {
+                const windowWithSheet = window as Window & {
+                  openSelectedPlacesSheet?: () => void;
+                };
+                windowWithSheet.openSelectedPlacesSheet?.();
               }
             }}
           />

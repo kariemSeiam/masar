@@ -3,12 +3,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { MapPin, X, Check, Loader2 } from 'lucide-react';
-import { Place, PlaceType, PLACE_TYPES, GOVERNORATES, CITIES } from '@/lib/types';
-import { BottomSheet } from '@/components/bottom-sheet';
+import { Place, PlaceType, PLACE_TYPES, GOVERNORATES, CITIES } from '@/types';
+import { BottomSheet } from '@/components/common/bottom-sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getPlaceIcon } from '@/lib/store';
+import { getPlaceIcon } from '@/lib/utils/place';
 
 interface AddPlaceSheetProps {
   isOpen: boolean;

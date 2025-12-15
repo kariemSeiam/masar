@@ -4,24 +4,24 @@ import { useState, useMemo, useEffect, useCallback, memo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import { List, Map as MapIcon, Filter, X, Minus, GripVertical, MapPin, Circle, CheckCircle, Clock, ChevronDownIcon, Search, Check, Navigation, Target, Locate, Building2, Phone, Globe, CheckSquare, Square, Tag, Calendar } from 'lucide-react';
-import { Place, PlaceStatus, GOVERNORATES, CITIES, STATUS_COLORS, Visit, PLACE_TYPES, PlaceType } from '@/lib/types';
+import { Place, PlaceStatus, GOVERNORATES, CITIES, STATUS_COLORS, Visit, PLACE_TYPES, PlaceType } from '@/types';
 
 const MapView = dynamic(
-  () => import('@/components/MapView').then((mod) => ({ default: mod.MapView })),
+  () => import('@/components/features/places/MapView').then((mod) => ({ default: mod.MapView })),
   {
     ssr: false,
     loading: () => <div className="relative w-full h-full overflow-hidden bg-muted animate-pulse" />
   }
 );
-import { PlaceCard } from '@/components/PlaceCard';
-import { PlaceDetailsSheet } from '@/components/PlaceDetailsSheet';
+import { PlaceCard } from '@/components/features/places/PlaceCard';
+import { PlaceDetailsSheet } from '@/components/features/places/PlaceDetailsSheet';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { BottomSheet } from '@/components/bottom-sheet';
-import { calculateDistance } from '@/lib/store';
+import { BottomSheet } from '@/components/common/bottom-sheet';
+import { calculateDistance } from '@/lib/utils/distance';
 
 interface PlanScreenProps {
   places: Place[];
@@ -716,14 +716,20 @@ export function PlanScreen({
                     variant="popup"
                     isInJourney={selectedPlaceIds.has(selectedPlace.id)}
                     onAddToJourney={() => onTogglePlace(selectedPlace)}
-                    onCall={() => window.open(`tel:${selectedPlace.phone}`)}
+                    onCall={() => {
+                      if (typeof window !== 'undefined' && selectedPlace.phone) {
+                        window.open(`tel:${selectedPlace.phone}`, '_blank');
+                      }
+                    }}
                     notesCount={placeNotesCount.get(selectedPlace.id) || 0}
                     onOpenInMaps={() => {
-                      const url = `https://www.google.com/maps/dir/?api=1&destination=${selectedPlace.lat},${selectedPlace.lng}`;
-                      window.open(url, '_blank', 'noopener,noreferrer');
+                      if (typeof window !== 'undefined') {
+                        const url = `https://www.google.com/maps/dir/?api=1&destination=${selectedPlace.lat},${selectedPlace.lng}`;
+                        window.open(url, '_blank', 'noopener,noreferrer');
+                      }
                     }}
                     onWhatsApp={() => {
-                      if (selectedPlace.phone) {
+                      if (typeof window !== 'undefined' && selectedPlace.phone) {
                         const phoneNumber = selectedPlace.phone.replace(/[^0-9]/g, '');
                         const url = `https://wa.me/${phoneNumber}`;
                         window.open(url, '_blank', 'noopener,noreferrer');

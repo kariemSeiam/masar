@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Star, Check, Calendar, XCircle, AlertCircle, Flag, FileText, Plus } from 'lucide-react';
-import { Place, VisitOutcome } from '@/lib/types';
-import { getPlaceIcon } from '@/lib/store';
+import { Place, VisitOutcome } from '@/types';
+import { getPlaceIcon } from '@/lib/utils/place';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { BottomSheet } from '@/components/bottom-sheet';
-import { AddPlaceSheet } from '@/components/AddPlaceSheet';
+import { BottomSheet } from '@/components/common/bottom-sheet';
+import { AddPlaceSheet } from '@/components/features/plan/AddPlaceSheet';
 
 interface CheckInModalProps {
   place: Place;

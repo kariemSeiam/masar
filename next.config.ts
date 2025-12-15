@@ -25,13 +25,14 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  turbopack: {
-    rules: {
-      "*.{jsx,tsx}": {
-        loaders: [loaderPath]
-      }
-    }
-  },
+  // Turbopack configuration - disabled for static export compatibility
+  // turbopack: {
+  //   rules: {
+  //     "*.{jsx,tsx}": {
+  //       loaders: [loaderPath]
+  //     }
+  //   }
+  // },
   // GitHub Pages configuration
   output: 'export',
   basePath: process.env.NODE_ENV === 'production' ? '/masar' : '',

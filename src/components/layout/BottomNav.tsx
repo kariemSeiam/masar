@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { Database, MapPin, History, Navigation, Rocket } from 'lucide-react';
-import { useBottomSheet } from '@/lib/bottom-sheet-context';
+import { useBottomSheet } from '@/contexts/BottomSheetContext';
 
 type TabId = 'data' | 'plan' | 'journey' | 'history';
 

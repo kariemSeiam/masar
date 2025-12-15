@@ -6,5 +6,6 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 // Re-export utility functions for convenience
-export * from './utils/place';
-export * from './utils/distance';
+export * from './place';
+export * from './distance';
+

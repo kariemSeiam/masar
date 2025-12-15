@@ -22,9 +22,10 @@ import {
   Clock,
   ExternalLink,
 } from 'lucide-react';
-import { Place, Visit, STATUS_LABELS, PLACE_TYPES } from '@/lib/types';
-import { getPlaceIcon, getStatusColor, calculateDistance, formatDistance, formatDuration } from '@/lib/store';
-import { BottomSheet } from '@/components/bottom-sheet';
+import { Place, Visit, STATUS_LABELS, PLACE_TYPES } from '@/types';
+import { getPlaceIcon, getStatusColor } from '@/lib/utils/place';
+import { calculateDistance, formatDistance, formatDuration } from '@/lib/utils/distance';
+import { BottomSheet } from '@/components/common/bottom-sheet';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
@@ -102,30 +103,30 @@ export function PlaceDetailsSheet({
   }, [place]);
 
   const handleCall = useCallback(() => {
-    if (!place?.phone) return;
+    if (!place?.phone || typeof window === 'undefined') return;
     window.open(`tel:${place.phone}`, '_blank');
   }, [place]);
 
   const handleWhatsApp = useCallback(() => {
-    if (!place?.phone) return;
+    if (!place?.phone || typeof window === 'undefined') return;
     const phoneNumber = place.phone.replace(/[^0-9]/g, '');
     const url = `https://wa.me/${phoneNumber}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   }, [place]);
 
   const handleNavigate = useCallback(() => {
-    if (!place) return;
+    if (!place || typeof window === 'undefined') return;
     const url = `https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lng}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   }, [place]);
 
   const handleOpenWebsite = useCallback(() => {
-    if (!place?.website) return;
+    if (!place?.website || typeof window === 'undefined') return;
     window.open(place.website, '_blank', 'noopener,noreferrer');
   }, [place]);
 
   const handleOpenFacebook = useCallback(() => {
-    if (!place?.facebook) return;
+    if (!place?.facebook || typeof window === 'undefined') return;
     window.open(place.facebook, '_blank', 'noopener,noreferrer');
   }, [place]);
 
@@ -498,10 +499,10 @@ export function PlaceDetailsSheet({
                         <p className="text-sm text-foreground mb-2">{visit.notes}</p>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <span>
-                            {format(visit.checkInTime, 'd MMMM yyyy', { locale: ar })}
+                            {format(new Date(visit.checkInTime), 'd MMMM yyyy', { locale: ar })}
                           </span>
                           <span>•</span>
-                          <span>{format(visit.checkInTime, 'hh:mm a', { locale: ar })}</span>
+                          <span>{format(new Date(visit.checkInTime), 'hh:mm a', { locale: ar })}</span>
                           {visit.rating && (
                             <>
                               <span>•</span>

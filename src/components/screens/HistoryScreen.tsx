@@ -3,13 +3,13 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronRight, ChevronLeft, CheckCircle, Calendar, XCircle, Clock, Star, BarChart3, FileText, Filter, Map as MapIcon, PenSquare } from 'lucide-react';
-import { Visit, Place } from '@/lib/types';
+import { Visit, Place } from '@/types';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfDay, endOfDay, isWithinInterval, isSameDay, isSameMonth, isSameWeek } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
-import { PlaceDetailsSheet } from '@/components/PlaceDetailsSheet';
+import { PlaceDetailsSheet } from '@/components/features/places/PlaceDetailsSheet';
 
 interface HistoryScreenProps {
   visits: Visit[];
@@ -468,7 +468,7 @@ export function HistoryScreen({
                       <div className="w-px h-full bg-border self-stretch min-h-[60px]" />
 
                       <div className="text-sm text-muted-foreground font-medium whitespace-nowrap">
-                        {format(visit.checkInTime, 'hh:mm a', { locale: ar })}
+                        {format(new Date(visit.checkInTime), 'hh:mm a', { locale: ar })}
                       </div>
                     </div>
                   </motion.div>

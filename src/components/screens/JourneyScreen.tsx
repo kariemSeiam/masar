@@ -4,21 +4,21 @@ import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import { SkipForward, Flag, Navigation, Phone, MessageCircle, MapPin, Ruler, Clock, Copy, Check } from 'lucide-react';
-import { Place, VisitOutcome } from '@/lib/types';
+import { Place, VisitOutcome, Visit } from '@/types';
 
 const MapView = dynamic(
-  () => import('@/components/MapView').then((mod) => ({ default: mod.MapView })),
+  () => import('@/components/features/places/MapView').then((mod) => ({ default: mod.MapView })),
   {
     ssr: false,
     loading: () => <div className="relative w-full h-full overflow-hidden bg-muted animate-pulse" />
   }
 );
-import { CheckInModal } from '@/components/CheckInModal';
-import { JourneyComplete } from '@/components/JourneyComplete';
-import { PlaceDetailsSheet } from '@/components/PlaceDetailsSheet';
+import { CheckInModal } from '@/components/features/journey/CheckInModal';
+import { JourneyComplete } from '@/components/features/journey/JourneyComplete';
+import { PlaceDetailsSheet } from '@/components/features/places/PlaceDetailsSheet';
 import { Button } from '@/components/ui/button';
-import { getPlaceIcon, calculateDistance, formatDistance, formatDuration } from '@/lib/store';
-import { Visit } from '@/lib/types';
+import { getPlaceIcon } from '@/lib/utils/place';
+import { calculateDistance, formatDistance, formatDuration } from '@/lib/utils/distance';
 
 interface JourneyScreenProps {
   places: Place[];
@@ -70,22 +70,23 @@ export function JourneyScreen({
   }, [distance]);
 
   const handleOpenInMaps = () => {
-    if (!currentPlace) return;
+    if (!currentPlace || typeof window === 'undefined') return;
     window.open(
       `https://www.google.com/maps/dir/?api=1&destination=${currentPlace.lat},${currentPlace.lng}`,
-      '_blank'
+      '_blank',
+      'noopener,noreferrer'
     );
   };
 
   const handleCall = () => {
-    if (!currentPlace?.phone) return;
+    if (!currentPlace?.phone || typeof window === 'undefined') return;
     window.open(`tel:${currentPlace.phone}`, '_blank');
   };
 
   const handleWhatsApp = () => {
-    if (!currentPlace?.phone) return;
+    if (!currentPlace?.phone || typeof window === 'undefined') return;
     const phone = currentPlace.phone.replace(/[^0-9]/g, '');
-    window.open(`https://wa.me/2${phone}`, '_blank');
+    window.open(`https://wa.me/2${phone}`, '_blank', 'noopener,noreferrer');
   };
 
 

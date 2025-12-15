@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform, PanInfo } from 'framer-motion';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useBottomSheet } from '@/lib/bottom-sheet-context';
+import { useBottomSheet } from '@/contexts/BottomSheetContext';
 
 export interface BottomSheetProps {
   isOpen: boolean;

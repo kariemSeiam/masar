@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, ChevronDown, ChevronUp, MapPin, Phone, Star, Download, Settings, BarChart3, Rocket, Sun, Moon, Database, Search, X, ChevronDownIcon, Tag, Clock, CheckCircle2, Sparkles, Zap, TrendingUp, Map } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { PLACE_TYPES, GOVERNORATES, CITIES } from '@/lib/types';
+import { PLACE_TYPES, GOVERNORATES, CITIES } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -31,7 +31,7 @@ interface Order {
   placeType: string;
   governorates: string[];
   cities: string[];
-  createdAt: Date;
+  createdAt: string; // ISO string
   status: 'pending' | 'processing' | 'completed';
 }
 
@@ -259,7 +259,7 @@ export function DataScreen({ availableData, onAddToMap }: DataScreenProps) {
           placeType: selectedType,
           governorates: [...selectedGovernorates],
           cities: [...selectedCities],
-          createdAt: new Date(),
+          createdAt: new Date().toISOString(),
           status: 'pending'
         };
         

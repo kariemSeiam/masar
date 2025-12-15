@@ -25,15 +25,15 @@ export interface Place {
   ratingCount?: number;
   status: PlaceStatus;
   isImportant: boolean;
-  createdAt: Date;
+  createdAt: string; // ISO string
 }
 
 export interface Visit {
   id: string;
   placeId: string;
   placeName: string;
-  date: Date;
-  checkInTime: Date;
+  date: string; // ISO string
+  checkInTime: string; // ISO string
   outcome: VisitOutcome;
   notes?: string;
   rating?: number;
@@ -43,9 +43,9 @@ export interface Visit {
 
 export interface Journey {
   id: string;
-  date: Date;
-  startTime: Date;
-  endTime?: Date;
+  date: string; // ISO string
+  startTime: string; // ISO string
+  endTime?: string; // ISO string
   places: string[];
   status: 'planning' | 'active' | 'completed';
   currentIndex: number;
@@ -96,3 +96,4 @@ export const STATUS_LABELS: Record<PlaceStatus, string> = {
   closed: 'مغلق',
   not_found: 'غير موجود',
 };
+

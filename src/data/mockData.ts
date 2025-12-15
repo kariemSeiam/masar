@@ -1,8 +1,6 @@
 'use client';
 
-import React from 'react';
-import { Place, Visit, Journey, PlaceStatus } from './types';
-import { Pill, UtensilsCrossed, Coffee, Store, Croissant, Building2, MapPin } from 'lucide-react';
+import { Place, Visit } from '@/types';
 
 const ZAGAZIG_CENTER = { lat: 30.5877, lng: 31.5020 };
 
@@ -23,7 +21,7 @@ export const mockPlaces: Place[] = [
     ratingCount: 127,
     status: 'new',
     isImportant: true,
-    createdAt: new Date(),
+    createdAt: new Date().toISOString(),
   },
   {
     id: '2',
@@ -39,7 +37,7 @@ export const mockPlaces: Place[] = [
     ratingCount: 89,
     status: 'new',
     isImportant: false,
-    createdAt: new Date(),
+    createdAt: new Date().toISOString(),
   },
   {
     id: '3',
@@ -56,7 +54,7 @@ export const mockPlaces: Place[] = [
     ratingCount: 203,
     status: 'visited',
     isImportant: true,
-    createdAt: new Date(),
+    createdAt: new Date().toISOString(),
   },
   {
     id: '4',
@@ -72,7 +70,7 @@ export const mockPlaces: Place[] = [
     ratingCount: 65,
     status: 'postponed',
     isImportant: false,
-    createdAt: new Date(),
+    createdAt: new Date().toISOString(),
   },
   {
     id: '5',
@@ -89,7 +87,7 @@ export const mockPlaces: Place[] = [
     ratingCount: 312,
     status: 'new',
     isImportant: true,
-    createdAt: new Date(),
+    createdAt: new Date().toISOString(),
   },
   {
     id: '6',
@@ -105,7 +103,7 @@ export const mockPlaces: Place[] = [
     ratingCount: 98,
     status: 'new',
     isImportant: false,
-    createdAt: new Date(),
+    createdAt: new Date().toISOString(),
   },
   {
     id: '7',
@@ -123,7 +121,7 @@ export const mockPlaces: Place[] = [
     ratingCount: 156,
     status: 'new',
     isImportant: false,
-    createdAt: new Date(),
+    createdAt: new Date().toISOString(),
   },
   {
     id: '8',
@@ -141,7 +139,7 @@ export const mockPlaces: Place[] = [
     ratingCount: 234,
     status: 'visited',
     isImportant: false,
-    createdAt: new Date(),
+    createdAt: new Date().toISOString(),
   },
 ];
 
@@ -150,8 +148,8 @@ export const mockVisits: Visit[] = [
     id: 'v1',
     placeId: '3',
     placeName: 'صيدلية الأمل',
-    date: new Date(),
-    checkInTime: new Date(Date.now() - 2 * 60 * 60 * 1000),
+    date: new Date().toISOString(),
+    checkInTime: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     outcome: 'visited',
     notes: 'باع 20 علبة باندول، مهتم بالعروض الجديدة',
     rating: 5,
@@ -160,8 +158,8 @@ export const mockVisits: Visit[] = [
     id: 'v2',
     placeId: '8',
     placeName: 'مطعم الأصدقاء',
-    date: new Date(),
-    checkInTime: new Date(Date.now() - 4 * 60 * 60 * 1000),
+    date: new Date().toISOString(),
+    checkInTime: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
     outcome: 'visited',
     notes: 'تم الاتفاق على توريد جديد',
     rating: 4,
@@ -170,8 +168,8 @@ export const mockVisits: Visit[] = [
     id: 'v3',
     placeId: '4',
     placeName: 'صيدلية الحياة',
-    date: new Date(),
-    checkInTime: new Date(Date.now() - 5 * 60 * 60 * 1000),
+    date: new Date().toISOString(),
+    checkInTime: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
     outcome: 'postponed',
     notes: 'صاحبها مش موجود، هزوره بكرة',
   },
@@ -189,8 +187,8 @@ export const mockVisits: Visit[] = [
     id: 'v5',
     placeId: '1',
     placeName: 'صيدلية الشفاء',
-    date: new Date(),
-    checkInTime: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+    date: new Date().toISOString(),
+    checkInTime: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
     outcome: 'visited',
     notes: 'مهتم بالعروض الصيفية',
     rating: 4,
@@ -199,8 +197,8 @@ export const mockVisits: Visit[] = [
     id: 'v6',
     placeId: '5',
     placeName: 'صيدلية السلام',
-    date: new Date(),
-    checkInTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+    date: new Date().toISOString(),
+    checkInTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
     outcome: 'visited',
     notes: 'طلب عرض خاص على الأدوية المزمنة',
     rating: 5,
@@ -209,8 +207,8 @@ export const mockVisits: Visit[] = [
     id: 'v7',
     placeId: '5',
     placeName: 'صيدلية السلام',
-    date: new Date(),
-    checkInTime: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+    date: new Date().toISOString(),
+    checkInTime: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
     outcome: 'visited',
     notes: 'اتفقنا على توريد شهري',
     rating: 5,
@@ -227,72 +225,3 @@ export const mockVisits: Visit[] = [
   },
 ];
 
-export const getPlaceIcon = (
-  type: string, 
-  size: string = 'w-5 h-5', 
-  variant: 'light' | 'primary' = 'light'
-): React.ReactNode => {
-  const icons: Record<string, React.ComponentType<{ className?: string }>> = {
-    pharmacy: Pill,
-    restaurant: UtensilsCrossed,
-    cafe: Coffee,
-    supermarket: Store,
-    bakery: Croissant,
-    clinic: Building2,
-    other: MapPin,
-  };
-  const IconComponent = icons[type] || MapPin;
-  const colorClass = variant === 'primary' ? 'text-white' : 'text-primary';
-  return React.createElement(IconComponent, { className: `${size} ${colorClass}` });
-};
-
-export const getStatusColor = (status: PlaceStatus): string => {
-  const colors: Record<PlaceStatus, string> = {
-    new: '#4A90D9',
-    visited: '#34C759',
-    postponed: '#F5A623',
-    closed: '#8E8E93',
-    not_found: '#FF3B30',
-  };
-  return colors[status];
-};
-
-// Helper function to lighten a hex color by mixing with white
-const lightenColor = (hex: string, amount: number = 0.3): string => {
-  const num = parseInt(hex.replace('#', ''), 16);
-  const r = Math.min(255, Math.floor((num >> 16) + (255 - (num >> 16)) * amount));
-  const g = Math.min(255, Math.floor(((num >> 8) & 0x00FF) + (255 - ((num >> 8) & 0x00FF)) * amount));
-  const b = Math.min(255, Math.floor((num & 0x0000FF) + (255 - (num & 0x0000FF)) * amount));
-  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
-};
-
-export const getStatusColorLight = (status: PlaceStatus): string => {
-  return lightenColor(getStatusColor(status), 0.35);
-};
-
-export const formatDistance = (km: number): string => {
-  if (km < 1) {
-    return `${Math.round(km * 1000)} م`;
-  }
-  return `${km.toFixed(1)} كم`;
-};
-
-export const formatDuration = (minutes: number): string => {
-  if (minutes < 60) {
-    return `${Math.round(minutes)} د.ق`;
-  }
-  const hours = Math.floor(minutes / 60);
-  const mins = Math.round(minutes % 60);
-  return `${hours} س ${mins > 0 ? `و ${mins} د.ق` : ''}`;
-};
-
-export const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLng/2) * Math.sin(dLng/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
-};

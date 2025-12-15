@@ -4,11 +4,12 @@ import { useRef, useCallback, useEffect, useState, useMemo, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Edit, Star, Sun, Moon, ChevronDownIcon, Search, Check, CheckCircle2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { Place, PLACE_TYPES, GOVERNORATES, CITIES } from '@/lib/types';
-import { getPlaceIcon, getStatusColor, getStatusColorLight, calculateDistance, formatDistance } from '@/lib/store';
+import { Place, PLACE_TYPES, GOVERNORATES, CITIES } from '@/types';
+import { getPlaceIcon, getStatusColor, getStatusColorLight } from '@/lib/utils/place';
+import { calculateDistance, formatDistance } from '@/lib/utils/distance';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
-import { MapContainer, TileLayer, Marker, Popup, Circle, Polyline, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Circle, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -250,14 +251,7 @@ const CustomMarker = memo(({ place, index, isSelected, isInJourney, journeyIndex
         eventHandlers={{
           click: onSelect,
         }}
-      >
-        <Popup>
-          <div className="text-center p-2">
-            <p className="font-semibold">{place.name}</p>
-            <p className="text-sm text-muted-foreground">{place.city}</p>
-          </div>
-        </Popup>
-      </Marker>
+      />
     </>
   );
 });

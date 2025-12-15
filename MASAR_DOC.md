@@ -12,36 +12,84 @@
 
 ---
 
+## 🛠️ Tech Stack
+
+### Framework & Language
+- **Framework**: Next.js 15 (App Router)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS 4
+- **UI Components**: Radix UI (shadcn/ui)
+- **Animations**: Framer Motion
+- **Maps**: Leaflet (via React-Leaflet)
+- **State Management**: React Hooks (useState, useMemo, useEffect)
+- **Forms**: React Hook Form + Zod (via shadcn/ui)
+- **Theme**: next-themes (Light/Dark mode support)
+- **Date Handling**: date-fns with Arabic locale
+
+### Project Structure
+```
+src/
+├── app/              # Next.js app router pages
+│   ├── layout.tsx   # Root layout with Cairo font & RTL
+│   ├── page.tsx     # Main app component with tab navigation
+│   └── globals.css  # Global styles & theme variables
+├── components/       # React components
+│   ├── screens/     # Main screen components
+│   │   ├── DataScreen.tsx
+│   │   ├── PlanScreen.tsx
+│   │   ├── JourneyScreen.tsx
+│   │   └── HistoryScreen.tsx
+│   ├── ui/          # Reusable UI components (shadcn/ui)
+│   └── [other components]
+├── lib/             # Utilities and types
+│   ├── types.ts     # TypeScript type definitions
+│   ├── store.ts     # Mock data & helper functions
+│   └── constants.ts # App constants
+└── hooks/           # Custom React hooks
+```
+
+---
+
 ## 🎨 Design System
 
 ### Visual Identity
-| Element | Value |
-|---------|-------|
-| Primary | `#4A90D9` (Calm Blue) |
-| Success | `#34C759` (Visited Green) |
-| Warning | `#F5A623` (Scheduled Orange) |
-| Danger | `#FF3B30` (Overdue Red) |
-| Neutral | `#8E8E93` (Gray) |
-| Background | `#F8F9FA` |
-| Cards | `#FFFFFF` with `shadow-sm` |
+| Element | Value | CSS Variable |
+|---------|-------|--------------|
+| Primary | `#4A90D9` (Calm Blue) | `--primary`, `--masar-blue` |
+| Success | `#34C759` (Visited Green) | `--masar-green` |
+| Warning | `#F5A623` (Scheduled Orange) | `--masar-orange` |
+| Danger | `#FF3B30` (Overdue Red) | `--destructive`, `--masar-red` |
+| Neutral | `#8E8E93` (Gray) | `--muted-foreground`, `--masar-gray` |
+| Background | `#F8F9FA` | `--background` |
+| Cards | `#FFFFFF` | `--card` |
+| Dark Mode | Supported via `next-themes` | `.dark` class |
 
 ### Typography
-- **Arabic**: Cairo font (Google Fonts)
-- **English**: Inter
-- RTL layout by default
-- Direction: `rtl` on `<html>`
+- **Arabic**: Cairo font (Google Fonts) - weights: 300, 400, 500, 600, 700, 800
+- **Font Variable**: `--font-cairo`
+- **RTL Layout**: `dir="rtl"` on `<html>` tag
+- **Font Family**: Applied via `font-[Cairo]` class
 
 ### Components Style
-- Border radius: `12px` (cards), `8px` (buttons), `full` (chips)
-- Shadows: Soft, minimal (`0 2px 8px rgba(0,0,0,0.08)`)
-- Transitions: `200ms ease-out`
-- Glass-morphism for overlays: `backdrop-blur-md bg-white/80`
+- **Border Radius**: 
+  - Cards: `12px` (`rounded-2xl`)
+  - Buttons: `8px` (`rounded-xl`) to `full` (rounded-full)
+  - Inputs: `12px` (`rounded-xl`)
+- **Shadows**: 
+  - Soft: `shadow-soft` (custom utility)
+  - Elevated: `shadow-elevated` (for floating elements)
+- **Transitions**: `200ms ease-out` (via Tailwind `transition-all`)
+- **Glass-morphism**: `glass` class with `backdrop-blur-md bg-white/80 dark:bg-card/80`
+- **Gradients**: 
+  - Primary: `gradient-primary` (blue gradient)
+  - Success: `gradient-success` (green gradient)
 
 ### Design Soul
 - **Warm & Friendly**: Speaks like a companion, not a tool
 - **Calm Density**: Information-rich without overwhelm
-- **Purposeful Animation**: Celebrate wins (confetti on journey complete)
+- **Purposeful Animation**: Smooth transitions, hover effects, and micro-interactions via Framer Motion
 - **Arabic-First**: Not translated — natively designed for Arabic
+- **Dark Mode**: Full dark mode support with theme switching
 
 ---
 
@@ -56,7 +104,27 @@
 └─────────────────────────────────┘
 ```
 
-**Navigation**: Bottom tab bar with 4 icons + Extended FAB for "Start Journey"
+### Navigation Structure
+- **Bottom Navigation Bar**: Fixed bottom tab bar with 4 tabs
+  - Icons: Database (البيانات), MapPin (التجهيز), Navigation (الرحلة), History (السجل)
+  - Active tab indicator with animated background
+  - Tab labels below icons
+- **Start Journey Button**: Floating button above bottom nav (when applicable)
+  - Shows when: Not on Data tab, and (not on Plan tab OR on Plan map view)
+  - Disabled when: No places selected
+- **Selected Places Button**: Shows count badge when places are selected
+  - Opens bottom sheet with selected places list
+- **Theme Toggle**: Sun/Moon icon in Data screen header
+
+### State Management
+- Main app state managed in `page.tsx`:
+  - `activeTab`: Current tab ('data' | 'plan' | 'journey' | 'history')
+  - `places`: Array of all places
+  - `visits`: Array of all visits
+  - `selectedPlaces`: Places selected for journey
+  - `userLocation`: Current GPS location
+  - `isJourneyActive`: Whether journey is currently active
+  - `journeyIndex`: Current place index in journey
 
 ---
 
@@ -65,57 +133,95 @@
 ### Purpose
 Order places data OR add places manually. Entry point for building your territory.
 
+### Implementation
+**Component**: `DataScreen.tsx`  
+**Location**: `src/components/screens/DataScreen.tsx`
+
 ### Header
-- Title: "مسار" with logo
-- Right: Settings icon
+- **Left**: Theme toggle button (Sun/Moon icon) + "مسار" title with "طلب البيانات" subtitle
+- **Right**: Empty (no settings icon currently)
 
-### Main Content
+### Main Content Structure
 
-**Section A — Available Data** (Collapsible)
+**Section A — Orders Section** (Collapsible, shows when orders exist)
+- Header with Rocket icon and completion badge
+- Shows pending orders with expandable details
+- Each order shows:
+  - Place type icon and name
+  - Status badge (قيد الانتظار / قيد المعالجة / مكتمل)
+  - Governorates and cities grouped by governorate
+  - Delete city functionality (with confirmation dialog)
+- Expandable to show full order details
+
+**Section B — Available Data** (Collapsible)
 Shows place types user already has data for:
-```
-┌──────────────────────────────────────┐
-│ 💊 صيدليات     │ 📍 187 مكان        │
-│ 🍽️ مطاعم      │ 📍 45 مكان         │
-│ ➕ طلب نوع جديد                      │
-└──────────────────────────────────────┘
-```
+- Each item displays:
+  - Place type icon (💊 صيدلية, 🍽️ مطعم, etc.)
+  - Place type label
+  - Count of places
+  - "Add to Map" button (Map icon) - navigates to Plan screen with filters applied
+- "Request New Type" button at bottom
+- Clicking an item auto-fills the order form below
 
-**Section B — Order New Data**
-1. **Place Type Selector** (Grid of common types + custom input)
-   - 💊 Pharmacies, 🏪 Supermarkets, 🍞 Bakeries
-   - 🏥 Clinics, ☕ Cafes, 🍽️ Restaurants
-   - Custom: Text input with icon picker
+**Section C — Order New Data** (Collapsible)
+1. **Place Name Input**
+   - Text input with Tag icon
+   - Auto-filled when selecting from available data or place type
 
-2. **Location Selector**
-   - **Governorate** dropdown (multi-select enabled)
-   - **Cities/Districts** chips (multi-select, depends on governorate)
-   - "Select All" / "Clear" actions
+2. **Place Type Selector** (Grid layout, 3 columns)
+   - Available types: صيدلية, ماركت, ملابس, كافيه, مطعم, أخرى
+   - Each type shows icon and label
+   - Selecting type auto-fills place name (except "أخرى")
+   - Visual selection state with border and background
 
-3. **Preview Card**
+3. **Location Selectors**
+   - **Governorate Popover**:
+     - Multi-select with checkboxes
+     - Search functionality
+     - Shows selected count or single name
+   - **City Popover**:
+     - Depends on selected governorates
+     - Multi-select with checkboxes
+     - Grouped by governorate
+     - "Select All" / "Clear All" per governorate
+     - Shows "متوفر" badge for cities with existing data
+     - Cities with data are locked (can't be unchecked)
+
+4. **Summary Card** (Shows when selections made)
+   - Groups cities by governorate
+   - Shows chips for each city
+   - Green badge for cities with available data
+   - Remove buttons for each city/governorate
+
+5. **Preview Card** (Shows when type and locations selected)
    ```
    ┌────────────────────────────────────┐
    │ 📊 البيانات المتوقعة              │
-   │ ~180-220 صيدلية                   │
-   │ 📞 ~40% بأرقام تليفون             │
+   │ ~180-220 مكان                     │
+   │ 📞 ~40% بأرقام                    │
    │ ⭐ ~76% بتقييمات                  │
    └────────────────────────────────────┘
    ```
 
-4. **CTA Button**: `[📥 طلب البيانات]` (Primary, full-width)
+6. **CTA Button**: `[📥 طلب البيانات]` 
+   - Primary gradient button
+   - Disabled until: place name, type, governorates, and cities are selected
+   - Creates/updates order (merges if same type exists)
+   - Resets form after submission
 
 ### Empty State
-```
-┌────────────────────────────────────────┐
-│      [Illustration: Map + Pins]        │
-│                                        │
-│   ابدأ رحلتك! 🚀                       │
-│   اطلب بيانات الأماكن اللي بتشتغل    │
-│   معاها عشان تجهز رحلاتك              │
-│                                        │
-│   [💊 طلب بيانات صيدليات]             │
-└────────────────────────────────────────┘
-```
+Shows when `availableData.length === 0`:
+- Large MapPin icon in muted circle
+- "ابدأ رحلتك! 🚀" heading
+- Description text
+- CTA button: "طلب بيانات صيدليات"
+
+### Key Features
+- **Order Management**: Orders persist in component state
+- **Smart Merging**: Orders with same place type merge cities/governorates
+- **City Deletion**: Can delete cities from orders (with confirmation)
+- **Data Integration**: Clicking available data auto-fills form
+- **Theme Support**: Dark/light mode toggle
 
 ---
 
@@ -124,62 +230,127 @@ Shows place types user already has data for:
 ### Purpose
 Filter and select places for today's journey. The "preparation room" before execution.
 
-### Header
-- Back arrow (if coming from Data)
-- Title: "تجهيز الرحلة"
-- Right: Map/List toggle
+### Implementation
+**Component**: `PlanScreen.tsx`  
+**Location**: `src/components/screens/PlanScreen.tsx`  
+**Map Component**: `MapView.tsx` (dynamically imported)
 
-### Filters Bar (Horizontal scroll chips)
-```
-[الكل] [جديد 🔵] [تمت الزيارة 🟢] [مؤجل 🟡] [مهم ⭐]
-```
+### View Modes
+Two view modes with toggle:
+- **Map View** (Primary): Full-screen interactive map
+- **List View** (Secondary): Scrollable list of place cards
 
-### Location Filter (Dropdown bar)
-```
-المحافظة: [الشرقية ▼]  المدينة: [الزقازيق ▼]
-```
+### Header (List View Only)
+- **Left**: Calendar icon + "تجهيز الرحلة" title
+- **Right**: Map icon button (switches to map view)
 
-### Map View (Primary)
-- Full-screen map with markers
-- Marker colors match status:
-  - 🔵 Blue: New (never visited)
-  - 🟢 Green: Visited
-  - 🟡 Orange: Postponed
-  - ⭐ Gold outline: Important
-- User location pulsing dot
-- Tap marker → Mini card popup
-
-### Mini Card (On marker tap)
+### Status Filters Bar (Horizontal scroll chips)
+Located at top of both views:
 ```
-┌────────────────────────────────────┐
-│ 💊 صيدلية الشفاء          ⭐ 4.3  │
-│ 📍 شارع الجلاء، الزقازيق          │
-│ 📞 055-123-4567                   │
-│ [➕ أضف للرحلة] [📝 ملاحظة]       │
-└────────────────────────────────────┘
+[الكل (count)] [جديد 🔵 (count)] [تمت الزيارة 🟢 (count)] [مؤجل 🟡 (count)]
 ```
+- Color-coded by status
+- Shows count for each status
+- Smooth horizontal scroll
+- Active filter highlighted with solid background
 
-### Bottom Sheet (Swipe up)
-- Shows selected places count: "12 مكان محدد للرحلة"
-- List of selected places (reorderable)
-- Radius filter slider: "المسافة: 5 كم"
-- Remove button per place (swipe or X)
+### Additional Filters (List View)
+- **Place Type Filter**: Tag icon button with popover
+  - Multi-select checkboxes for all place types
+  - Shows count when active
+- **Has Phone Filter**: Phone icon toggle button
+- **Has Website Filter**: Globe icon toggle button
+- **Select All Toggle**: CheckSquare/Square icon button
+  - Selects/deselects all filtered places
 
-### Actions
-- **Add Manual Place**: FAB with ➕ icon → Opens add form
-- **Extended FAB**: `[🚀 ابدأ الرحلة]` (Bottom right, prominent)
+### Location Filters (Map View)
+- **Governorate & City Selectors**: 
+  - Popover dropdowns with search
+  - Multi-select with checkboxes
+  - Shows selected count or single name
+  - Green checkmark button to confirm selection
+  - Appears when clicking location edit button
 
-### List View (Secondary)
-Standard list with place cards:
-```
-┌────────────────────────────────────────┐
-│ 🔵 │ صيدلية الشفاء           ⭐ 4.3   │
-│    │ 📍 الزقازيق • 1.2 كم             │
-│    │ 📞 055-123-4567                   │
-│    │ 🏷️ جديد • لم تتم الزيارة         │
-│    │                           [→]    │
-└────────────────────────────────────────┘
-```
+### Map View Features
+- **Full-screen Map**: Leaflet map with custom styling
+- **Markers**: 
+  - Color-coded by status (matches STATUS_COLORS)
+  - Blue (#4A90D9): New
+  - Green (#34C759): Visited
+  - Orange (#F5A623): Postponed
+  - Gray (#8E8E93): Closed
+  - Red (#FF3B30): Not found
+- **User Location**: Pulsing blue dot
+- **Selected Places**: Highlighted route line connecting them
+- **Current Target**: Highlighted marker (in journey mode)
+- **Tap Marker**: Opens PlaceCard popup
+
+### PlaceCard Popup (Map View)
+Shows when marker is tapped:
+- Place icon and name
+- Address
+- Phone number (if available)
+- Distance from user location
+- Status badge
+- Action buttons:
+  - Add/Remove from journey
+  - Call (if phone available)
+  - WhatsApp (if phone available)
+  - Open in Google Maps
+  - View details
+- Notes count badge (if notes exist)
+
+### Floating Action Buttons (Map View)
+- **List View Toggle**: Building icon, bottom-left
+  - Shows filtered places count badge
+- **Radius Filter**: Target icon, bottom-right
+  - Popover with range slider
+  - Dynamic range expansion (0-2.5km, then expands)
+  - Shows current radius value
+  - Reset and Save buttons
+
+### Bottom Sheet (Selected Places)
+Opens via "المحددة" button in bottom nav:
+- Title: "الأماكن المحددة (count)"
+- Draggable with snap points (60%, 90%)
+- List of selected places:
+  - Numbered badges (1, 2, 3...)
+  - Grip icon (for future reordering)
+  - Place name and address
+  - Remove button (Minus icon)
+- Swipe down to close
+
+### List View Features
+- **Place Cards**: 
+  - Status indicator dot
+  - Place icon and name
+  - Address and distance
+  - Phone number (if available)
+  - Status and type badges
+  - Notes count badge
+  - Tap to toggle selection
+  - Tap details area to open PlaceDetailsSheet
+- **Empty State**: 
+  - Animated MapPin icon
+  - "لا توجد أماكن" message
+  - Helpful text based on filter state
+
+### PlaceDetailsSheet (Both Views)
+Full-screen bottom sheet with:
+- Place header with icon
+- All place details
+- Visit history
+- Notes section (add/delete)
+- Action buttons (Call, WhatsApp, Navigate, Add to journey)
+- Swipe down to close
+
+### Key Features
+- **Smart Filtering**: Filters combine (status + location + type + radius + phone/website)
+- **Initial Filters**: Can receive filters from Data screen when adding data to map
+- **Radius Filter**: Dynamic range slider with auto-expansion
+- **Selection Management**: Toggle places on/off, view selected count
+- **Notes Integration**: Shows notes count, allows adding notes
+- **Responsive**: Smooth transitions between views
 
 ---
 
@@ -188,102 +359,142 @@ Standard list with place cards:
 ### Purpose
 Active navigation mode. Guides rep through optimized route with check-in at each stop.
 
+### Implementation
+**Component**: `JourneyScreen.tsx`  
+**Location**: `src/components/screens/JourneyScreen.tsx`  
+**Check-in Modal**: `CheckInModal.tsx`  
+**Complete Screen**: `JourneyComplete.tsx`
+
 ### Triggered By
-"Start Journey" FAB → Takes current location → Calculates optimal route
+"Start Journey" button → Takes selected places → Calculates route (nearest neighbor algorithm) → Starts journey
 
-### Layout
+### Layout Structure
 
-**Top Section (40%)**: Map with route
-- Animated route line connecting places
-- Current location prominent
-- Next destination highlighted
-- Progress: `📍───📍───📍───📍`
+**Full-screen Map Background**:
+- MapView component with journey mode enabled
+- Route line connecting all places
+- Current location marker
+- Current target highlighted
+- All journey places shown as markers
 
-**Bottom Section (60%)**: Current target card
+**Bottom Card Overlay** (60% of screen):
+- Rounded top corners (`rounded-t-3xl`)
+- Contains all journey controls and info
 
+### Floating Action Buttons
+- **Navigation Button** (Bottom-left, floating):
+  - Opens Google Maps navigation to current place
+  - Blue primary color with shadow
+- **Check-in Button** (Bottom-right, floating):
+  - "وصلت؟" (Did you arrive?) label
+  - Green success color
+  - Opens CheckInModal
+
+### Station Info Section
+- **Progress**: "المحطة X من Y"
+- **Skip Button**: "تخطي" with SkipForward icon
+- **Progress Bar**: Horizontal bars showing:
+  - Green: Completed stops
+  - Blue: Current stop
+  - Gray: Upcoming stops
+
+### Current Place Card
+- **Place Icon**: Large icon in gradient circle
+- **Place Name**: Bold, large text
+- **Phone Number**: 
+  - Displayed if available
+  - Copy button with checkmark feedback
+- **Distance & Time Chips**:
+  - Blue chip: Distance (e.g., "1.2 كم")
+  - Orange chip: Estimated time (e.g., "5 د.ق")
+- **Address**: Below name (if available)
+- **Action Buttons Row**:
+  - Google Maps (red)
+  - WhatsApp (green, if phone available)
+  - Call (blue, if phone available)
+
+### Check-in Modal (BottomSheet)
+
+**Trigger**: "وصلت؟" button
+
+**Layout**:
+- Draggable bottom sheet (65-75% height)
+- Place header with icon and name
+- "Add New Place" button (top-right)
+
+**Outcome Selection** (4 buttons in grid):
 ```
-┌──────────────────────────────────────────┐
-│  المحطة 2 من 8                   [تخطي →] │
-│                                          │
-│  ┌────────────────────────────────────┐  │
-│  │ 💊 صيدلية النور                    │  │
-│  │                                    │  │
-│  │ 📍 شارع الملك فيصل، الزقازيق       │  │
-│  │ 📞 055-123-4567  📱 WhatsApp       │  │
-│  │ ⭐ 4.1  •  🔵 زيارة أولى           │  │
-│  │                                    │  │
-│  │ 📏 1.2 كم  •  🚗 ~5 دقائق          │  │
-│  │                                    │  │
-│  │ [🗺️ افتح في خرائط جوجل]           │  │
-│  └────────────────────────────────────┘  │
-│                                          │
-│  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─  │
-│                                          │
-│  🏁 وصلت؟                                │
-│                                          │
-│  ┌────────┬────────┬────────┬────────┐   │
-│  │   ✅   │   🗓️   │   🚫   │   ❌   │   │
-│  │ تمت   │ تأجيل  │ مغلق  │ غير   │   │
-│  │الزيارة │        │       │ موجود │   │
-│  └────────┴────────┴────────┴────────┘   │
-│                                          │
-└──────────────────────────────────────────┘
+┌────────┬────────┬────────┬────────┐
+│   ✅   │   🗓️   │   🚫   │   ❌   │
+│ تمت   │ تأجيل  │ مغلق  │ غير   │
+│الزيارة │        │       │ موجود │
+└────────┴────────┴────────┴────────┘
 ```
+- Color-coded: Green, Orange, Gray, Red
+- Selected state: Solid background with white text
 
-### Check-in Flow (Modal)
+**Extended Content** (When "تمت الزيارة" selected):
 
-**On "✅ تمت الزيارة" tap:**
-```
-┌──────────────────────────────────────────┐
-│ ✅ تسجيل زيارة: صيدلية النور       [✕]   │
-├──────────────────────────────────────────┤
-│                                          │
-│  📝 ملاحظات الزيارة                      │
-│  ┌────────────────────────────────────┐  │
-│  │ اكتب ملاحظاتك هنا...               │  │
-│  │ مثال: "باع 20 علبة باندول"         │  │
-│  │                                    │  │
-│  └────────────────────────────────────┘  │
-│                                          │
-│  النتيجة:                                │
-│  [تم البيع ✓] [مهتم] [غير مهتم] [أخرى]   │
-│                                          │
-│  ⭐ تقييم الزيارة (اختياري)              │
-│  ☆ ☆ ☆ ☆ ☆                              │
-│                                          │
-│         [✅ حفظ والمتابعة]               │
-│                                          │
-└──────────────────────────────────────────┘
-```
+1. **Result Options** (Horizontal scroll chips):
+   - "تم البيع" (Sale completed)
+   - "مهتم" (Interested)
+   - "غير مهتم" (Not interested)
+   - Optional selection, can select one
 
-**On "🗓️ تأجيل" tap:**
-- Date picker → Returns place to list with "postponed" status
-- Optional: Add reason note
+2. **Rating Stars** (Optional):
+   - 5-star rating system
+   - Hover effect for preview
+   - Amber/yellow filled stars
 
-**On "🚫 مغلق" or "❌ غير موجود" tap:**
-- Confirmation dialog
-- Marks place appropriately
-- Moves to next stop
+3. **Notes Textarea**:
+   - Multi-line text input
+   - Placeholder: "اكتب ملاحظاتك هنا... مثال: 'باع 20 علبة باندول'"
+   - Auto-expands
+
+**Submit Button**:
+- "حفظ والمتابعة" (Save and Continue)
+- Green gradient
+- Disabled until outcome selected
+- Submits and moves to next place
+
+**Other Outcomes**:
+- **تأجيل** (Postponed): Just notes, no rating
+- **مغلق** (Closed): Just notes
+- **غير موجود** (Not Found): Just notes
+
+### Add New Place Feature
+- Button in CheckInModal header
+- Opens AddPlaceSheet
+- Allows adding place at current location
+- Saves and continues journey
 
 ### Journey Complete Screen
-```
-┌──────────────────────────────────────────┐
-│                                          │
-│               🎉 🎉 🎉                    │
-│                                          │
-│          أحسنت! خلصت الرحلة              │
-│                                          │
-│  ┌────────────────────────────────────┐  │
-│  │ ✅ 6 زيارات ناجحة                  │  │
-│  │ 🗓️ 2 مؤجلين                        │  │
-│  │ 🚫 0 مغلق                          │  │
-│  │ ⏱️ الوقت: 3 ساعات 20 دقيقة         │  │
-│  └────────────────────────────────────┘  │
-│                                          │
-│  [📋 شوف التفاصيل]  [🏠 الرئيسية]       │
-│                                          │
-└──────────────────────────────────────────┘
-```
+
+**Component**: `JourneyComplete.tsx`
+
+**Layout**:
+- Centered celebration content
+- Confetti animation (via Framer Motion)
+- Stats cards:
+  - ✅ Visited count (green)
+  - 🗓️ Postponed count (orange)
+  - 🚫 Closed count (gray)
+  - ⏱️ Duration (blue)
+- Action buttons:
+  - "شوف التفاصيل" (View Details) - navigates to History
+  - "الرئيسية" (Home) - returns to Plan screen
+
+### Key Features
+- **Route Optimization**: Nearest neighbor algorithm (simple MVP)
+- **Progress Tracking**: Visual progress bar and station counter
+- **Distance Calculation**: Real-time distance from user to current place
+- **Time Estimation**: ~3 minutes per kilometer
+- **Skip Functionality**: Can skip places without check-in
+- **Notes Integration**: Can add notes during check-in
+- **Rating System**: Optional 5-star rating for successful visits
+- **Add Places**: Can add new places during journey
+- **Navigation Integration**: Opens Google Maps for directions
+- **Contact Actions**: Quick access to call/WhatsApp
 
 ---
 
@@ -292,47 +503,102 @@ Active navigation mode. Guides rep through optimized route with check-in at each
 ### Purpose
 Review past visits, notes, and daily performance. The "memory" of your work.
 
+### Implementation
+**Component**: `HistoryScreen.tsx`  
+**Location**: `src/components/screens/HistoryScreen.tsx`  
+**Date Library**: `date-fns` with Arabic locale
+
 ### Header
-- Title: "السجل"
-- Right: Date filter / Calendar icon
+- **Left**: Calendar icon + "السجل" title
+- **Right**: Map icon button (navigates to Plan screen)
 
-### Date Picker Bar
-```
-[◀️] اليوم: الأربعاء 10 ديسمبر [▶️]
-```
+### Filter Tabs (Horizontal scroll)
+Five filter options:
+1. **الكل** (All): Shows all visits
+2. **اليوم** (Today): Today's visits only
+3. **هذا الأسبوع** (This Week): Current week
+4. **هذا الشهر** (This Month): Current month
+5. **مخصص** (Custom): Date range picker
 
-### Daily Summary Card
+**Custom Date Range**:
+- Opens calendar popover
+- Range selection mode
+- "تطبيق" (Apply) button
+- Shows selected range in header
+
+### Date Navigation (For Week/Month/Custom)
+- **Previous Button**: ChevronRight icon (RTL)
+- **Date Display**: Formatted date range
+- **Next Button**: ChevronLeft icon (RTL)
+- Only shows for week/month/custom filters
+
+### Summary Card
+Shows statistics for filtered period:
 ```
 ┌────────────────────────────────────────────┐
-│ 📊 ملخص اليوم                              │
+│ 📊 ملخص [Period]                           │
 │                                            │
-│ ✅ 8 زيارات  │ 🗓️ 2 مؤجل  │ ⏱️ 4:30 ساعة  │
+│ ✅ X زيارات  │ 🗓️ Y مؤجل  │ ⏱️ Z ساعة     │
 └────────────────────────────────────────────┘
 ```
+- **Visited Count**: Green card with CheckCircle icon
+- **Postponed Count**: Orange card with Calendar icon
+- **Duration**: Blue card with Clock icon (currently static "4:30")
 
 ### Visits List
-```
-┌────────────────────────────────────────────┐
-│ 10:30 ص │ ✅ صيدلية الشفاء                 │
-│         │ 📝 "باع 20 باندول، مهتم بعرض..." │
-│         │ ⭐⭐⭐⭐☆                          │
-├─────────────────────────────────────────────│
-│ 11:15 ص │ 🗓️ صيدلية النور                  │
-│         │ 📝 "مؤجل - صاحبها مش موجود"      │
-├─────────────────────────────────────────────│
-│ 12:00 م │ ✅ صيدلية الأمل                  │
-│         │ 📝 "تم البيع - طلب زيارة الأسبوع.." │
-│         │ ⭐⭐⭐⭐⭐                          │
-└────────────────────────────────────────────┘
-```
+Each visit card shows:
+- **Left Section**:
+  - Outcome icon (color-coded):
+    - ✅ Green: Visited
+    - 🗓️ Orange: Postponed
+    - ❌ Gray: Closed
+    - ❌ Red: Not Found
+  - Manual note indicator: PenSquare icon (purple) for manually added notes
+  - Place name (bold)
+  - Notes text (if available) with FileText icon
+  - Star rating (if available, amber/yellow)
+- **Right Section**:
+  - Vertical divider
+  - Check-in time (formatted: "hh:mm a" in Arabic)
 
-### Place Detail (On tap)
-Opens modal with full visit history for that place:
-- All visits with dates
-- All notes
-- Contact info (phone, website, social)
-- Rating trend
-- Quick actions: Call, WhatsApp, Navigate, Add to next journey
+**Empty State**:
+- Large Calendar icon
+- "لا توجد زيارات" heading
+- Helpful message
+
+### Place Details Sheet
+Opens when tapping a visit card:
+- **Component**: `PlaceDetailsSheet.tsx`
+- **Full Details**:
+  - Place header with icon
+  - Address and location info
+  - Contact info (phone, website, Facebook)
+  - Distance from user location
+- **Visit History**:
+  - All visits to this place
+  - Chronological list with dates/times
+  - Notes for each visit
+  - Ratings displayed
+- **Notes Section**:
+  - List of all notes
+  - Add note button
+  - Delete note functionality
+- **Actions**:
+  - Add to journey button
+  - Call button (if phone available)
+  - WhatsApp button (if phone available)
+  - Open in Google Maps button
+- **Swipe down to close**
+
+### Key Features
+- **Date Filtering**: Multiple filter types with navigation
+- **Arabic Dates**: Full Arabic date formatting via date-fns
+- **Visit Grouping**: Shows all visits chronologically
+- **Manual Notes**: Distinguishes manual notes from visit notes
+- **Rating Display**: Visual star ratings
+- **Place Details**: Full place information and history
+- **Quick Actions**: Easy access to contact and navigation
+- **Responsive**: Smooth animations and transitions
 
 ---
 
@@ -341,123 +607,269 @@ Opens modal with full visit history for that place:
 ### Purpose
 Manually add a new place to the database.
 
+### Implementation
+**Component**: `AddPlaceSheet.tsx`  
+**Location**: `src/components/AddPlaceSheet.tsx`  
+**Opens From**: 
+- CheckInModal (during journey)
+- Plan screen (via FAB - if implemented)
+
+### Layout
+- **Bottom Sheet**: Draggable sheet (85-95% height)
+- **Title**: "إضافة مكان جديد" with close button
+- **Form Fields**: Vertical stack with spacing
+
 ### Form Fields
-```
-┌────────────────────────────────────────────┐
-│ ➕ إضافة مكان جديد                    [✕]  │
-├────────────────────────────────────────────┤
-│                                            │
-│ اسم المكان *                               │
-│ ┌────────────────────────────────────────┐ │
-│ │                                        │ │
-│ └────────────────────────────────────────┘ │
-│                                            │
-│ نوع المكان *                               │
-│ [💊 صيدلية ▼]                              │
-│                                            │
-│ المحافظة *            المدينة *            │
-│ [الشرقية ▼]           [الزقازيق ▼]         │
-│                                            │
-│ العنوان (اختياري)                          │
-│ ┌────────────────────────────────────────┐ │
-│ │                                        │ │
-│ └────────────────────────────────────────┘ │
-│                                            │
-│ 📍 تحديد الموقع على الخريطة               │
-│ [اضغط لاختيار الموقع]                      │
-│                                            │
-│ رقم التليفون (اختياري)                     │
-│ ┌────────────────────────────────────────┐ │
-│ │                                        │ │
-│ └────────────────────────────────────────┘ │
-│                                            │
-│ ملاحظات (اختياري)                          │
-│ ┌────────────────────────────────────────┐ │
-│ │                                        │ │
-│ │                                        │ │
-│ └────────────────────────────────────────┘ │
-│                                            │
-│            [💾 حفظ المكان]                 │
-│                                            │
-└────────────────────────────────────────────┘
-```
+
+1. **Place Name** (Required)
+   - Text input with MapPin icon
+   - Placeholder: "أدخل اسم المكان"
+   - Auto-focus on open
+   - RTL direction
+
+2. **Place Type** (Required)
+   - Select dropdown
+   - Shows icon + label
+   - Options: All PLACE_TYPES (صيدلية, ماركت, ملابس, كافيه, مطعم, أخرى)
+   - Default: "أخرى"
+
+3. **Governorate** (Required)
+   - Select dropdown
+   - Options: All GOVERNORATES
+   - Placeholder: "اختر المحافظة"
+   - RTL direction
+   - Resets city when changed
+
+4. **City** (Required)
+   - Select dropdown
+   - Depends on selected governorate
+   - Options: CITIES[governorate]
+   - Placeholder: "اختر المدينة" or "اختر المحافظة أولاً"
+   - Disabled until governorate selected
+   - RTL direction
+
+5. **Location** (Required)
+   - Status display:
+     - ✅ "تم الحصول على الموقع" with coordinates
+     - ❌ "لم يتم الحصول على الموقع"
+   - **Get Current Location Button**:
+     - Uses browser Geolocation API
+     - Shows loading spinner while getting location
+     - Falls back to userLocation prop if available
+     - Error handling with alerts
+
+### Save Button
+- **Label**: "حفظ المكان"
+- **Style**: Primary gradient, full-width, large height
+- **Disabled Until**: All required fields filled (name, type, governorate, city, location)
+- **On Save**: 
+  - Creates new Place object
+  - Sets status to 'new'
+  - Sets isImportant to false
+  - Calls onSave callback
+  - Closes sheet
+  - Resets form
+
+### Key Features
+- **Geolocation**: Uses browser API to get current location
+- **Form Validation**: Required fields enforced
+- **Smart Defaults**: Auto-fills location from userLocation prop
+- **Error Handling**: Alerts for missing fields or geolocation errors
+- **Reset on Close**: Form clears when sheet closes
+- **RTL Support**: All inputs support RTL text
 
 ---
 
-## 🗂️ Data Model (Simplified)
+## 🗂️ Data Model
+
+### Type Definitions
+**File**: `src/lib/types.ts`
 
 ### Place
 ```typescript
-{
-  id: string
-  name: string
-  type: 'pharmacy' | 'restaurant' | 'cafe' | ...
-  governorate: string
-  city: string
-  address?: string
-  lat?: number
-  lng?: number
-  phone?: string
-  website?: string
-  facebook?: string
-  rating?: number
-  ratingCount?: number
-  status: 'new' | 'visited' | 'postponed' | 'closed' | 'not_found'
-  isImportant: boolean
-  createdAt: Date
+export type PlaceType = 'pharmacy' | 'restaurant' | 'cafe' | 'supermarket' | 'bakery' | 'clinic' | 'other';
+
+export type PlaceStatus = 'new' | 'visited' | 'postponed' | 'closed' | 'not_found';
+
+export interface Place {
+  id: string;
+  name: string;
+  type: PlaceType;
+  governorate: string;
+  city: string;
+  address?: string;
+  lat: number;  // Required (not optional)
+  lng: number; // Required (not optional)
+  phone?: string;
+  website?: string;
+  facebook?: string;
+  rating?: number;
+  ratingCount?: number;
+  status: PlaceStatus;
+  isImportant: boolean;
+  createdAt: string; // ISO string (not Date object)
 }
 ```
+
+**Place Types**:
+- `pharmacy` → صيدلية (Pill icon)
+- `supermarket` → ماركت (Store icon)
+- `bakery` → مخبز (Croissant icon)
+- `clinic` → ملابس (Building2 icon) - Note: Label says "clothes" but icon suggests clinic
+- `cafe` → كافيه (Coffee icon)
+- `restaurant` → مطعم (UtensilsCrossed icon)
+- `other` → أخرى (MapPin icon)
+
+**Status Colors**:
+- `new`: #4A90D9 (Blue)
+- `visited`: #34C759 (Green)
+- `postponed`: #F5A623 (Orange)
+- `closed`: #8E8E93 (Gray)
+- `not_found`: #FF3B30 (Red)
 
 ### Visit
 ```typescript
-{
-  id: string
-  placeId: string
-  date: Date
-  checkInTime: Date
-  outcome: 'visited' | 'postponed' | 'closed' | 'not_found'
-  notes?: string
-  rating?: 1-5
-  soldItems?: string
+export type VisitOutcome = 'visited' | 'postponed' | 'closed' | 'not_found';
+
+export interface Visit {
+  id: string;
+  placeId: string;
+  placeName: string; // Cached for display
+  date: string; // ISO string
+  checkInTime: string; // ISO string
+  outcome: VisitOutcome;
+  notes?: string;
+  rating?: number; // 1-5
+  soldItems?: string; // Not currently used in UI
+  isManualNote?: boolean; // Indicates manually added note (not from visit)
 }
 ```
 
+**Visit Outcomes**:
+- `visited`: Successful visit (green)
+- `postponed`: Rescheduled visit (orange)
+- `closed`: Place was closed (gray)
+- `not_found`: Place doesn't exist (red)
+
 ### Journey
 ```typescript
-{
-  id: string
-  date: Date
-  startTime: Date
-  endTime?: Date
-  places: string[] // placeIds in order
-  status: 'planning' | 'active' | 'completed'
+export interface Journey {
+  id: string;
+  date: string; // ISO string
+  startTime: string; // ISO string
+  endTime?: string; // ISO string
+  places: string[]; // placeIds in order
+  status: 'planning' | 'active' | 'completed';
+  currentIndex: number; // Current place index in journey
 }
 ```
+
+**Journey Status**:
+- `planning`: Places selected, not started
+- `active`: Currently in progress
+- `completed`: Finished
+
+### Constants
+
+**Governorates** (`GOVERNORATES`):
+- الشرقية, القاهرة, الجيزة, الإسكندرية, الدقهلية, الغربية, المنوفية, البحيرة, كفر الشيخ, الفيوم
+
+**Cities** (`CITIES`):
+- Object mapping governorate → array of cities
+- Example: `{ 'الشرقية': ['الزقازيق', 'بلبيس', ...] }`
+
+**Place Types** (`PLACE_TYPES`):
+- Array of objects with `value`, `label`, and `icon` (React component)
+
+### Mock Data
+**File**: `src/lib/store.ts`
+
+- `mockPlaces`: Array of sample Place objects
+- `mockVisits`: Array of sample Visit objects
+- Helper functions:
+  - `getPlaceIcon(type, size, variant)`: Returns icon component
+  - `getStatusColor(status)`: Returns hex color
+  - `formatDistance(km)`: Formats distance (meters/kilometers)
+  - `formatDuration(minutes)`: Formats duration
+  - `calculateDistance(lat1, lng1, lat2, lng2)`: Haversine formula for distance
 
 ---
 
 ## 🔧 Technical Notes
 
 ### Map Integration
-- Use Mapbox GL or Google Maps
-- Arabic labels preferred
-- Route optimization: Nearest neighbor algorithm for simple MVP
+- **Library**: Leaflet (via React-Leaflet)
+- **Styling**: Custom map styles via CSS
+- **Markers**: Custom colored markers based on place status
+- **Route Display**: Polyline connecting selected places
+- **User Location**: Browser Geolocation API
+- **Navigation**: Opens Google Maps in external browser
+- **Route Optimization**: Nearest neighbor algorithm (simple MVP)
+- **Arabic Labels**: Map tiles support Arabic (depends on provider)
+
+### State Management
+- **Pattern**: React Hooks (useState, useMemo, useEffect)
+- **No Global State**: State managed in `page.tsx` and passed as props
+- **Local State**: Each screen manages its own local state
+- **Data Flow**: Props down, callbacks up pattern
+
+### Performance Optimizations
+- **Dynamic Imports**: MapView component dynamically imported (code splitting)
+- **Memoization**: useMemo for filtered lists and calculations
+- **Debouncing**: Filter inputs debounced (via constants)
+- **Lazy Loading**: Components loaded on demand
 
 ### Offline Consideration
-- Cache visited places
-- Queue check-ins when offline
-- Sync when back online
+- **Current**: Not implemented (MVP)
+- **Future**: 
+  - Cache visited places in localStorage
+  - Queue check-ins when offline
+  - Sync when back online
 
 ### Arabic Support
-- RTL throughout
-- Cairo font from Google Fonts
-- Egyptian Arabic for UI copy
+- **RTL Layout**: `dir="rtl"` on `<html>` tag
+- **Font**: Cairo from Google Fonts (weights 300-800)
+- **Date Formatting**: date-fns with Arabic locale (`ar`)
+- **UI Copy**: Egyptian Arabic throughout
+- **Text Direction**: All inputs support RTL
 
-### Key Animations
-- Marker bounce on select
-- Route line drawing animation
-- Confetti on journey complete
-- Smooth sheet transitions
+### Animations
+- **Library**: Framer Motion
+- **Key Animations**:
+  - Tab transitions (slide/fade)
+  - Bottom sheet drag and snap
+  - Button hover/tap effects
+  - Card entrance animations
+  - Progress bar updates
+  - Confetti on journey complete (via JourneyComplete component)
+- **Performance**: `willChange` CSS property for smooth animations
+
+### Theme System
+- **Library**: next-themes
+- **Modes**: Light (default) and Dark
+- **Implementation**: CSS variables with `.dark` class
+- **Toggle**: Available in Data screen header
+- **Persistence**: Theme preference stored
+
+### Bottom Sheet Component
+- **Custom Implementation**: `bottom-sheet.tsx`
+- **Features**:
+  - Draggable with snap points
+  - Backdrop dismiss
+  - Close on drag down
+  - Smooth animations
+- **Usage**: CheckInModal, AddPlaceSheet, PlaceDetailsSheet, Selected Places list
+
+### Error Handling
+- **Error Boundary**: `ErrorBoundary.tsx` and `ErrorBoundaryWrapper.tsx`
+- **Geolocation Errors**: Alert dialogs
+- **Form Validation**: Required field checks with alerts
+- **Network Errors**: Not currently handled (future enhancement)
+
+### Browser Compatibility
+- **Geolocation API**: Required for location features
+- **Modern Browsers**: Chrome, Firefox, Safari, Edge (latest versions)
+- **Mobile**: iOS Safari, Chrome Mobile
 
 ---
 

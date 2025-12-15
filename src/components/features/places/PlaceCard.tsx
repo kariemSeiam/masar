@@ -3,9 +3,9 @@
 import { memo, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Phone, MapPin, Plus, ExternalLink, MessageCircle, ChevronLeft, Car, Ruler, Clock, Globe, Facebook, Copy, Check, FileText } from 'lucide-react';
-import { Place } from '@/lib/types';
-import { getPlaceIcon, getStatusColor, formatDistance, formatDuration, calculateDistance } from '@/lib/store';
-import { STATUS_LABELS } from '@/lib/types';
+import { Place, STATUS_LABELS } from '@/types';
+import { getPlaceIcon, getStatusColor } from '@/lib/utils/place';
+import { formatDistance, formatDuration, calculateDistance } from '@/lib/utils/distance';
 import { Button } from '@/components/ui/button';
 
 interface PlaceCardProps {
@@ -197,7 +197,7 @@ function PlaceCardComponent({
                 e.stopPropagation();
                 if (onOpenInMaps) {
                   onOpenInMaps();
-                } else if (place.lat && place.lng) {
+                } else if (place.lat && place.lng && typeof window !== 'undefined') {
                   const url = `https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lng}`;
                   window.open(url, '_blank', 'noopener,noreferrer');
                 }
@@ -216,7 +216,7 @@ function PlaceCardComponent({
                 e.stopPropagation();
                 if (onWhatsApp) {
                   onWhatsApp();
-                } else if (place.phone) {
+                } else if (place.phone && typeof window !== 'undefined') {
                   const phoneNumber = place.phone.replace(/[^0-9]/g, '');
                   const url = `https://wa.me/${phoneNumber}`;
                   window.open(url, '_blank', 'noopener,noreferrer');
@@ -519,7 +519,9 @@ function PlaceCardComponent({
                 whileTap={{ scale: 0.95 }}
                 onClick={(e) => {
                   e.stopPropagation();
-                  window.open(place.website, '_blank', 'noopener,noreferrer');
+                  if (typeof window !== 'undefined' && place.website) {
+                    window.open(place.website, '_blank', 'noopener,noreferrer');
+                  }
                 }}
                 className="w-8 h-8 rounded-full bg-purple-500/10 hover:bg-purple-500/20 flex items-center justify-center transition-colors"
                 title="الموقع الإلكتروني"
@@ -533,7 +535,9 @@ function PlaceCardComponent({
                 whileTap={{ scale: 0.95 }}
                 onClick={(e) => {
                   e.stopPropagation();
-                  window.open(place.facebook, '_blank', 'noopener,noreferrer');
+                  if (typeof window !== 'undefined' && place.facebook) {
+                    window.open(place.facebook, '_blank', 'noopener,noreferrer');
+                  }
                 }}
                 className="w-8 h-8 rounded-full bg-blue-600/10 hover:bg-blue-600/20 flex items-center justify-center transition-colors"
                 title="صفحة فيسبوك"
