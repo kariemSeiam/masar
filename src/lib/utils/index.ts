@@ -8,4 +8,5 @@ export function cn(...inputs: ClassValue[]) {
 // Re-export utility functions for convenience
 export * from './place';
 export * from './distance';
+export * from './phone';
 

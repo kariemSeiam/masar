@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Pill, UtensilsCrossed, Coffee, Store, Croissant, Building2, MapPin } from 'lucide-react';
-import { PlaceStatus } from '@/types';
+import { PlaceStatus, Place, PLACE_TYPES } from '@/types';
 
 export const getPlaceIcon = (
   type: string, 
@@ -45,5 +45,14 @@ const lightenColor = (hex: string, amount: number = 0.3): string => {
 
 export const getStatusColorLight = (status: PlaceStatus): string => {
   return lightenColor(getStatusColor(status), 0.35);
+};
+
+// Get place type label, supporting customType for 'other' type
+export const getPlaceTypeLabel = (place: Place | { type: string; customType?: string }): string => {
+  if (place.type === 'other' && place.customType) {
+    return place.customType;
+  }
+  const typeInfo = PLACE_TYPES.find(t => t.value === place.type);
+  return typeInfo?.label || place.type;
 };
 
