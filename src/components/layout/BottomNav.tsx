@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { Database, MapPin, History, Navigation, Rocket } from 'lucide-react';
+import { Database, MapPin, History, Navigation, Rocket, Sparkles } from 'lucide-react';
 import { useBottomSheet } from '@/contexts/BottomSheetContext';
 
 type TabId = 'data' | 'plan' | 'journey' | 'history';
@@ -67,7 +67,7 @@ export function BottomNav({
                 </motion.button>
               )}
 
-              {selectedPlacesCount > 0 && onOpenSelectedPlaces && activeTab !== 'history' && activeTab !== 'data' && (
+              {selectedPlacesCount > 0 && selectedPlacesCount !== undefined && onOpenSelectedPlaces && activeTab !== 'history' && activeTab !== 'data' && !isJourneyActive && (
                 <motion.button
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -79,7 +79,7 @@ export function BottomNav({
                   whileTap={{ scale: 0.98 }}
                   style={{ willChange: 'transform, opacity' }}
                 >
-                  <MapPin className="w-4 h-4" />
+                  <Sparkles className="w-4 h-4 text-primary" />
                   <span>المحددة</span>
                   <span className="bg-primary text-white text-[10px] font-bold rounded-full h-5 min-w-5 px-1.5 flex items-center justify-center">
                     {selectedPlacesCount}
