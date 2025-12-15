@@ -1,12 +1,16 @@
 'use client';
 
-import { memo, useMemo, useState } from 'react';
+import { memo, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Phone, MapPin, Plus, ExternalLink, MessageCircle, ChevronLeft, Car, Ruler, Clock, Globe, Facebook, Copy, Check, FileText } from 'lucide-react';
 import { Place, STATUS_LABELS } from '@/types';
 import { getPlaceIcon, getStatusColor } from '@/lib/utils/place';
 import { formatDistance, formatDuration, calculateDistance } from '@/lib/utils/distance';
 import { Button } from '@/components/ui/button';
+import { getGoogleMapsDirectionUrl } from '@/lib/utils/maps';
+import { getWhatsAppUrl } from '@/lib/utils/phone';
+import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
+import { ESTIMATED_TIME_PER_KM } from '@/lib/constants';
 
 interface PlaceCardProps {
   place: Place;
@@ -43,10 +47,10 @@ function PlaceCardComponent({
   }, [userLocation, place.lat, place.lng]);
 
   const estimatedTime = useMemo(() => {
-    return distance ? Math.round(distance * 3) : null;
+    return distance ? Math.round(distance * ESTIMATED_TIME_PER_KM) : null;
   }, [distance]);
 
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard();
 
   if (variant === 'popup') {
     return (
@@ -90,15 +94,9 @@ function PlaceCardComponent({
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={async (e) => {
+                onClick={(e) => {
                   e.stopPropagation();
-                  try {
-                    await navigator.clipboard.writeText(place.phone || '');
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 2000);
-                  } catch (err) {
-                    console.error('Failed to copy:', err);
-                  }
+                  copy(place.phone || '');
                 }}
                 className="p-1 hover:bg-muted/50 rounded-md transition-colors"
                 title="نسخ الرقم"
@@ -198,7 +196,7 @@ function PlaceCardComponent({
                 if (onOpenInMaps) {
                   onOpenInMaps();
                 } else if (place.lat && place.lng && typeof window !== 'undefined') {
-                  const url = `https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lng}`;
+                  const url = getGoogleMapsDirectionUrl(place.lat, place.lng);
                   window.open(url, '_blank', 'noopener,noreferrer');
                 }
               }}
@@ -217,8 +215,7 @@ function PlaceCardComponent({
                 if (onWhatsApp) {
                   onWhatsApp();
                 } else if (place.phone && typeof window !== 'undefined') {
-                  const phoneNumber = place.phone.replace(/[^0-9]/g, '');
-                  const url = `https://wa.me/${phoneNumber}`;
+                  const url = getWhatsAppUrl(place.phone);
                   window.open(url, '_blank', 'noopener,noreferrer');
                 }
               }}
@@ -442,15 +439,9 @@ function PlaceCardComponent({
                 <motion.button
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={async (e) => {
+                  onClick={(e) => {
                     e.stopPropagation();
-                    try {
-                      await navigator.clipboard.writeText(place.phone || '');
-                      setCopied(true);
-                      setTimeout(() => setCopied(false), 2000);
-                    } catch (err) {
-                      console.error('Failed to copy:', err);
-                    }
+                    copy(place.phone || '');
                   }}
                   className="p-1.5 hover:bg-muted/50 rounded-md transition-colors"
                   title="نسخ الرقم"
