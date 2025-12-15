@@ -7,15 +7,20 @@ import { Place, Visit, VisitOutcome, CITIES } from '@/types';
 import { mockPlaces, mockVisits } from '@/data/mockData';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { DEFAULT_LOCATION, GEOLOCATION_TIMEOUT, GEOLOCATION_MAX_AGE } from '@/lib/constants';
+import { FILTER_APPLY_DELAY, MS_PER_HOUR, MS_PER_MINUTE } from '@/lib/constants/timing';
 import { DataScreen } from '@/components/screens/DataScreen';
 import { PlanScreen } from '@/components/screens/PlanScreen';
 import { JourneyScreen } from '@/components/screens/JourneyScreen';
 import { HistoryScreen } from '@/components/screens/HistoryScreen';
+import { LoginScreen } from '@/components/screens/LoginScreen';
+import { NameRegistrationScreen } from '@/components/screens/NameRegistrationScreen';
 import { BottomSheetProvider } from '@/contexts/BottomSheetContext';
+import { UserProvider, useUser } from '@/contexts/UserContext';
 
 type TabId = 'data' | 'plan' | 'journey' | 'history';
 
-export default function MasarApp() {
+function MasarAppContent() {
+  const { user, isLoading } = useUser();
   const [activeTab, setActiveTab] = useState<TabId>('plan');
   const [places, setPlaces] = useState<Place[]>(mockPlaces);
   const [visits, setVisits] = useState<Visit[]>(mockVisits);
@@ -95,10 +100,10 @@ export default function MasarApp() {
   // Clear initial map filters after they've been applied (when tab changes to plan)
   useEffect(() => {
     if (activeTab === 'plan' && initialMapFilters) {
-      // Clear filters after a short delay to allow PlanScreen to apply them
+      // Clear filters after a delay to allow PlanScreen and MapView to apply them
       const timer = setTimeout(() => {
         setInitialMapFilters(null);
-      }, 100);
+      }, FILTER_APPLY_DELAY);
       return () => clearTimeout(timer);
     }
   }, [activeTab, initialMapFilters]);
@@ -111,6 +116,10 @@ export default function MasarApp() {
       }
       return [...prev, place];
     });
+  }, []);
+
+  const handleReorderPlaces = useCallback((reorderedPlaces: Place[]) => {
+    setSelectedPlaces(reorderedPlaces);
   }, []);
 
   const handleStartJourney = useCallback(() => {
@@ -162,8 +171,8 @@ export default function MasarApp() {
       } else {
         const endTime = Date.now();
         const durationMs = journeyStartTime ? endTime - journeyStartTime : 0;
-        const hours = Math.floor(durationMs / (1000 * 60 * 60));
-        const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+        const hours = Math.floor(durationMs / MS_PER_HOUR);
+        const minutes = Math.floor((durationMs % MS_PER_HOUR) / MS_PER_MINUTE);
         
         setJourneyStats((prev) => ({
           ...prev,
@@ -183,8 +192,8 @@ export default function MasarApp() {
       // Last place skipped - complete the journey
       const endTime = Date.now();
       const durationMs = journeyStartTime ? endTime - journeyStartTime : 0;
-      const hours = Math.floor(durationMs / (1000 * 60 * 60));
-      const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+      const hours = Math.floor(durationMs / MS_PER_HOUR);
+      const minutes = Math.floor((durationMs % MS_PER_HOUR) / MS_PER_MINUTE);
       
       setJourneyStats((prev) => ({
         ...prev,
@@ -281,6 +290,37 @@ export default function MasarApp() {
     })).filter((d) => d.count > 0);
   }, [places]);
 
+  // Show loading state while checking user
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-center"
+        >
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+            className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-4"
+          />
+          <p className="text-muted-foreground">جاري التحميل...</p>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Show login screen if not logged in
+  if (!user) {
+    return <LoginScreen />;
+  }
+
+  // Show name registration if user exists but has no name
+  if (user && !user.name.trim()) {
+    return <NameRegistrationScreen />;
+  }
+
+  // Show main app if user is logged in and has name
   return (
     <BottomSheetProvider>
       <div className="min-h-screen bg-background">
@@ -322,6 +362,7 @@ export default function MasarApp() {
               places={places}
               selectedPlaces={selectedPlaces}
               onTogglePlace={handleTogglePlace}
+              onReorderPlaces={handleReorderPlaces}
               userLocation={userLocation}
               onPlaceSelect={setSelectedPlace}
               selectedPlace={selectedPlace}
@@ -362,6 +403,7 @@ export default function MasarApp() {
                 onAddNote={handleAddNote}
                 onDeleteNote={handleDeleteNote}
                 onAddNewPlace={handleAddNewPlace}
+                availableData={availableData}
               />
             ) : (
               <div className="h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-b from-background to-muted/30 relative overflow-hidden">
@@ -533,5 +575,13 @@ export default function MasarApp() {
         )}
       </div>
     </BottomSheetProvider>
+  );
+}
+
+export default function Page() {
+  return (
+    <UserProvider>
+      <MasarAppContent />
+    </UserProvider>
   );
 }
