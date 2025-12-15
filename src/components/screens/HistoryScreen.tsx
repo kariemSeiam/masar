@@ -1,14 +1,17 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronRight, ChevronLeft, CheckCircle, Calendar, XCircle, Clock, Star, BarChart3, FileText, Filter, Map as MapIcon, PenSquare } from 'lucide-react';
-import { Visit, Place } from '@/types';
+import { ChevronRight, ChevronLeft, CheckCircle, Calendar, XCircle, Clock, Star, BarChart3, FileText, Filter, Map as MapIcon, PenSquare, MapPin, Tag, Search, ChevronDownIcon } from 'lucide-react';
+import { Visit, Place, PLACE_TYPES, PlaceType, CITIES, GOVERNORATES } from '@/types';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfDay, endOfDay, isWithinInterval, isSameDay, isSameMonth, isSameWeek } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import type { DateRange } from 'react-day-picker';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { PlaceDetailsSheet } from '@/components/features/places/PlaceDetailsSheet';
 
 interface HistoryScreenProps {
@@ -43,9 +46,19 @@ export function HistoryScreen({
 }: HistoryScreenProps) {
   const [filterType, setFilterType] = useState<FilterType>('all');
   const [baseDate, setBaseDate] = useState<Date>(new Date()); // Base date for navigation
-  const [customDateRange, setCustomDateRange] = useState<{from?: Date; to?: Date} | undefined>({from: new Date(), to: new Date()});
+  const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>({from: new Date(), to: new Date()});
   const [showCustomPicker, setShowCustomPicker] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
+  
+  // Filter states
+  const [selectedPlaceTypes, setSelectedPlaceTypes] = useState<PlaceType[]>([]);
+  const [selectedGovernorates, setSelectedGovernorates] = useState<string[]>([]);
+  const [selectedCities, setSelectedCities] = useState<string[]>([]);
+  const [showTypeSelector, setShowTypeSelector] = useState(false);
+  const [showGovernoratesSelector, setShowGovernoratesSelector] = useState(false);
+  const [showCitiesSelector, setShowCitiesSelector] = useState(false);
+  const [governorateSearch, setGovernorateSearch] = useState<string>('');
+  const [citySearch, setCitySearch] = useState<string>('');
 
   // Calculate date range based on filter type
   const dateRange = useMemo(() => {
@@ -91,16 +104,137 @@ export function HistoryScreen({
     }
   }, [filterType, baseDate, customDateRange]);
 
-  // Filter visits based on date range
-  const filteredVisits = useMemo(() => {
-    if (filterType === 'all') {
-      return visits; // Return all visits without filtering
-    }
-    return visits.filter((visit) => {
-      const visitDate = new Date(visit.date);
-      return isWithinInterval(visitDate, dateRange);
+  // Get available data from places for filtering
+  const availableData = useMemo(() => {
+    const dataMap = new Map<string, { count: number; cities: Set<string>; governorates: Set<string> }>();
+    
+    places.forEach((place) => {
+      if (!dataMap.has(place.type)) {
+        dataMap.set(place.type, { count: 0, cities: new Set(), governorates: new Set() });
+      }
+      const data = dataMap.get(place.type)!;
+      data.count++;
+      
+      if (place.city) {
+        data.cities.add(place.city);
+      }
+      if (place.governorate) {
+        data.governorates.add(place.governorate);
+      } else if (place.city) {
+        for (const [gov, govCities] of Object.entries(CITIES)) {
+          if (govCities.includes(place.city)) {
+            data.governorates.add(gov);
+            break;
+          }
+        }
+      }
     });
-  }, [visits, dateRange, filterType]);
+    
+    return Array.from(dataMap.entries()).map(([type, { count, cities, governorates }]) => ({
+      type,
+      count,
+      cities: Array.from(cities),
+      governorates: Array.from(governorates),
+    })).filter((d) => d.count > 0);
+  }, [places]);
+
+  // Get all governorates that have data (from all places or filtered by place types)
+  const availableGovernorates = useMemo(() => {
+    const govsWithData = new Set<string>();
+    places.forEach((place) => {
+      // If place types are selected, only include governorates for those types
+      // Otherwise, include all governorates that have data
+      if (place.governorate) {
+        if (selectedPlaceTypes.length === 0 || selectedPlaceTypes.includes(place.type)) {
+          govsWithData.add(place.governorate);
+        }
+      }
+    });
+    return GOVERNORATES.filter(gov => govsWithData.has(gov));
+  }, [places, selectedPlaceTypes]);
+
+  // Get all available cities (from all places or filtered by place types/governorates)
+  const availableCities = useMemo(() => {
+    const citiesWithData = new Set<string>();
+    places.forEach((place) => {
+      if (place.city) {
+        // If place types are selected, only include cities for those types
+        const matchesPlaceType = selectedPlaceTypes.length === 0 || selectedPlaceTypes.includes(place.type);
+        
+        // If governorates are selected, only include cities from those governorates
+        // Otherwise, include all cities
+        const matchesGovernorate = selectedGovernorates.length === 0 || 
+          (place.governorate && selectedGovernorates.includes(place.governorate));
+        
+        if (matchesPlaceType && matchesGovernorate) {
+          citiesWithData.add(place.city);
+        }
+      }
+    });
+    
+    // Return cities sorted by their governorate order
+    const sortedCities: string[] = [];
+    const allGovernorates = selectedGovernorates.length > 0 ? selectedGovernorates : GOVERNORATES;
+    allGovernorates.forEach((gov) => {
+      const govCities = CITIES[gov] || [];
+      govCities.forEach((city) => {
+        if (citiesWithData.has(city) && !sortedCities.includes(city)) {
+          sortedCities.push(city);
+        }
+      });
+    });
+    
+    return sortedCities;
+  }, [selectedGovernorates, selectedPlaceTypes, places]);
+
+  // Get place types that exist in availableData
+  const availablePlaceTypes = useMemo(() => {
+    if (availableData.length === 0) return [];
+    const typesInData = new Set(availableData.map(d => d.type).filter(Boolean));
+    return PLACE_TYPES.filter(type => typesInData.has(type.value));
+  }, [availableData]);
+
+  // Don't auto-clear governorates and cities when place types are cleared
+  // Allow independent selection
+
+  // Filter visits based on date range and other filters
+  const filteredVisits = useMemo(() => {
+    let result = visits;
+    
+    // Filter by date range
+    if (filterType !== 'all') {
+      result = result.filter((visit) => {
+        const visitDate = new Date(visit.date);
+        return isWithinInterval(visitDate, dateRange);
+      });
+    }
+    
+    // Filter by place type
+    if (selectedPlaceTypes.length > 0) {
+      result = result.filter((visit) => {
+        const place = places.find(p => p.id === visit.placeId);
+        return place && selectedPlaceTypes.includes(place.type);
+      });
+    }
+    
+    // Filter by governorates
+    if (selectedGovernorates.length > 0) {
+      result = result.filter((visit) => {
+        const place = places.find(p => p.id === visit.placeId);
+        return place && selectedGovernorates.includes(place.governorate);
+      });
+    }
+    
+    // Filter by cities
+    if (selectedCities.length > 0) {
+      result = result.filter((visit) => {
+        const place = places.find(p => p.id === visit.placeId);
+        return place && selectedCities.includes(place.city);
+      });
+    }
+    
+    return result;
+  }, [visits, dateRange, filterType, selectedPlaceTypes, selectedGovernorates, selectedCities, places]);
 
   const visitedCount = filteredVisits.filter((v) => v.outcome === 'visited').length;
   const postponedCount = filteredVisits.filter((v) => v.outcome === 'postponed').length;
@@ -307,7 +441,349 @@ export function HistoryScreen({
       </div>
 
       <div className="px-4 pt-3 pb-8">
-        <div className="h-[calc(100vh-140px)] overflow-y-auto scrollbar-hide">
+        {/* Filter Chips */}
+        <div className="flex items-center justify-between mb-3">
+          <div 
+            className="flex flex-nowrap gap-2 overflow-x-auto scrollbar-hide"
+            style={{ 
+              WebkitOverflowScrolling: 'touch',
+              scrollBehavior: 'smooth',
+              touchAction: 'pan-x',
+              overscrollBehaviorX: 'contain'
+            }}
+            onWheel={(e) => {
+              e.preventDefault();
+              e.currentTarget.scrollLeft += e.deltaY;
+            }}
+          >
+            {/* Place Type Filter */}
+            <Popover open={showTypeSelector} onOpenChange={setShowTypeSelector}>
+              <PopoverTrigger asChild>
+                <motion.button
+                  whileTap={{ scale: 0.96 }}
+                  whileHover={{ scale: 1.02 }}
+                  transition={{ 
+                    duration: 0.2, 
+                    ease: [0.2, 0, 0, 1]
+                  }}
+                  className={`flex items-center gap-2 px-4 py-2.5 min-h-[40px] rounded-full whitespace-nowrap shrink-0 transition-all touch-manipulation ${
+                    selectedPlaceTypes.length > 0
+                      ? 'text-white'
+                      : 'text-foreground/80 hover:bg-primary/20 active:bg-primary/30'
+                  }`}
+                  style={selectedPlaceTypes.length > 0 ? { 
+                    backgroundColor: '#4A90D9',
+                    willChange: 'transform'
+                  } : { 
+                    backgroundColor: 'rgba(74,144,217,0.1)', 
+                    willChange: 'transform' 
+                  }}
+                >
+                  <Tag className={`w-4 h-4 ${selectedPlaceTypes.length > 0 ? 'text-white' : ''}`} style={selectedPlaceTypes.length > 0 ? undefined : { color: '#4A90D9' }} strokeWidth={selectedPlaceTypes.length > 0 ? 2.5 : 2} />
+                  <span className={`text-sm font-medium leading-5 ${selectedPlaceTypes.length > 0 ? 'text-white' : ''}`} style={selectedPlaceTypes.length > 0 ? undefined : { color: '#4A90D9' }}>
+                    {selectedPlaceTypes.length > 0 ? `نوع (${selectedPlaceTypes.length})` : 'نوع'}
+                  </span>
+                </motion.button>
+              </PopoverTrigger>
+              <PopoverContent 
+                className="w-auto min-w-[200px] max-w-[280px] p-3" 
+                align="end" 
+                side="bottom" 
+                dir="rtl"
+                sideOffset={8}
+              >
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-sm mb-1 text-right px-1">اختر النوع</h3>
+                  <ScrollArea className="h-auto max-h-[240px] scrollbar-hide">
+                    <div className="space-y-1 pr-1">
+                      {availablePlaceTypes.length > 0 ? (
+                        availablePlaceTypes.map((placeType) => {
+                          const dataItem = availableData.find(d => d.type === placeType.value);
+                          const count = dataItem?.count || 0;
+                          const isSelected = selectedPlaceTypes.includes(placeType.value);
+                          
+                          return (
+                            <label
+                              key={placeType.value}
+                              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
+                                isSelected 
+                                  ? 'bg-primary/10 hover:bg-primary/15' 
+                                  : 'hover:bg-accent'
+                              }`}
+                              dir="rtl"
+                            >
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedPlaceTypes([...selectedPlaceTypes, placeType.value]);
+                                  } else {
+                                    setSelectedPlaceTypes(selectedPlaceTypes.filter(t => t !== placeType.value));
+                                  }
+                                }}
+                                className="shrink-0"
+                              />
+                              <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                                <div className={`shrink-0 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`}>
+                                  {placeType.icon}
+                                </div>
+                                <span className={`text-sm font-medium flex-1 ${isSelected ? 'text-primary' : 'text-foreground'}`}>
+                                  {placeType.label}
+                                </span>
+                                {count > 0 && (
+                                  <span className={`text-xs shrink-0 px-1.5 py-0.5 rounded ${
+                                    isSelected 
+                                      ? 'bg-primary/20 text-primary' 
+                                      : 'bg-muted text-muted-foreground'
+                                  }`}>
+                                    {count}
+                                  </span>
+                                )}
+                              </div>
+                            </label>
+                          );
+                        })
+                      ) : (
+                        <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                          لا توجد أنواع أماكن متاحة
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                  {selectedPlaceTypes.length > 0 && (
+                    <div className="pt-2 border-t border-border">
+                      <button
+                        onClick={() => {
+                          setSelectedPlaceTypes([]);
+                          setShowTypeSelector(false);
+                        }}
+                        className="w-full text-xs text-primary hover:text-primary/80 px-3 py-2 rounded-lg hover:bg-primary/10 transition-colors font-medium text-right"
+                      >
+                        إلغاء الكل
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {/* Location Filter - Governorates Dropdown */}
+            {availableGovernorates.length > 0 && (
+              <Popover open={showGovernoratesSelector} onOpenChange={setShowGovernoratesSelector}>
+                <PopoverTrigger asChild>
+                  <motion.button
+                    whileTap={{ scale: 0.96 }}
+                    whileHover={{ scale: 1.02 }}
+                    transition={{ 
+                      duration: 0.2, 
+                      ease: [0.2, 0, 0, 1]
+                    }}
+                    className={`flex items-center gap-2 px-4 py-2.5 min-h-[40px] rounded-full whitespace-nowrap shrink-0 transition-all touch-manipulation ${
+                      selectedGovernorates.length > 0
+                        ? 'text-white'
+                        : 'text-foreground/80 hover:bg-primary/20 active:bg-primary/30'
+                    }`}
+                    style={selectedGovernorates.length > 0 ? { 
+                      backgroundColor: '#4A90D9',
+                      willChange: 'transform'
+                    } : { 
+                      backgroundColor: 'rgba(74,144,217,0.1)', 
+                      willChange: 'transform' 
+                    }}
+                  >
+                    <MapPin className={`w-4 h-4 ${selectedGovernorates.length > 0 ? 'text-white' : ''}`} style={selectedGovernorates.length > 0 ? undefined : { color: '#4A90D9' }} strokeWidth={selectedGovernorates.length > 0 ? 2.5 : 2} />
+                    <span className={`text-sm font-medium leading-5 ${selectedGovernorates.length > 0 ? 'text-white' : ''}`} style={selectedGovernorates.length > 0 ? undefined : { color: '#4A90D9' }}>
+                      {selectedGovernorates.length > 0 
+                        ? `${selectedGovernorates.length === 1 ? selectedGovernorates[0] : `${selectedGovernorates.length} محافظة`}`
+                        : 'المحافظة'}
+                    </span>
+                  </motion.button>
+                </PopoverTrigger>
+                <PopoverContent 
+                  className="w-auto min-w-[200px] max-w-[280px] p-3" 
+                  align="end" 
+                  side="bottom" 
+                  dir="rtl"
+                  sideOffset={8}
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <h3 className="font-semibold text-sm text-right px-1">اختر المحافظة</h3>
+                      {selectedGovernorates.length > 0 && (
+                        <button
+                          onClick={() => {
+                            setSelectedGovernorates([]);
+                            setSelectedCities([]);
+                            setShowGovernoratesSelector(false);
+                          }}
+                          className="text-xs text-primary hover:text-primary/80 px-2 py-1 rounded-lg hover:bg-primary/10 transition-colors font-medium"
+                        >
+                          إلغاء الكل
+                        </button>
+                      )}
+                    </div>
+                    <div className="relative mb-2">
+                      <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <input
+                        type="text"
+                        placeholder="ابحث عن محافظة..."
+                        value={governorateSearch}
+                        onChange={(e) => setGovernorateSearch(e.target.value)}
+                        className="w-full pr-9 pl-3 py-2 text-sm bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
+                        dir="rtl"
+                      />
+                    </div>
+                    <ScrollArea className="h-auto max-h-[240px] scrollbar-hide">
+                      <div className="space-y-1 pr-1">
+                        {availableGovernorates
+                          .filter(gov => !governorateSearch || gov.includes(governorateSearch) || gov.toLowerCase().includes(governorateSearch.toLowerCase()))
+                          .map((gov) => {
+                            const isSelected = selectedGovernorates.includes(gov);
+                            return (
+                              <label
+                                key={gov}
+                                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
+                                  isSelected 
+                                    ? 'bg-primary/10 hover:bg-primary/15' 
+                                    : 'hover:bg-accent'
+                                }`}
+                                dir="rtl"
+                              >
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      setSelectedGovernorates([...selectedGovernorates, gov]);
+                                    } else {
+                                      setSelectedGovernorates(selectedGovernorates.filter(g => g !== gov));
+                                      // Remove cities from this governorate
+                                      const govCities = CITIES[gov] || [];
+                                      setSelectedCities(selectedCities.filter(c => !govCities.includes(c)));
+                                    }
+                                  }}
+                                  className="shrink-0"
+                                />
+                                <span className={`text-sm font-medium flex-1 ${isSelected ? 'text-primary' : 'text-foreground'}`}>
+                                  {gov}
+                                </span>
+                              </label>
+                            );
+                          })}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
+            
+            {/* Cities Dropdown */}
+            {availableCities.length > 0 && (
+              <Popover open={showCitiesSelector} onOpenChange={setShowCitiesSelector}>
+                <PopoverTrigger asChild>
+                  <motion.button
+                    whileTap={{ scale: 0.96 }}
+                    whileHover={{ scale: 1.02 }}
+                    transition={{ 
+                      duration: 0.2, 
+                      ease: [0.2, 0, 0, 1]
+                    }}
+                    className={`flex items-center gap-2 px-4 py-2.5 min-h-[40px] rounded-full whitespace-nowrap shrink-0 transition-all touch-manipulation ${
+                      selectedCities.length > 0
+                        ? 'text-white'
+                        : 'text-foreground/80 hover:bg-primary/20 active:bg-primary/30'
+                    }`}
+                    style={selectedCities.length > 0 ? { 
+                      backgroundColor: '#4A90D9',
+                      willChange: 'transform'
+                    } : { 
+                      backgroundColor: 'rgba(74,144,217,0.1)', 
+                      willChange: 'transform' 
+                    }}
+                  >
+                    <MapPin className={`w-4 h-4 ${selectedCities.length > 0 ? 'text-white' : ''}`} style={selectedCities.length > 0 ? undefined : { color: '#4A90D9' }} strokeWidth={selectedCities.length > 0 ? 2.5 : 2} />
+                    <span className={`text-sm font-medium leading-5 ${selectedCities.length > 0 ? 'text-white' : ''}`} style={selectedCities.length > 0 ? undefined : { color: '#4A90D9' }}>
+                      {selectedCities.length > 0 
+                        ? `${selectedCities.length === 1 ? selectedCities[0] : `${selectedCities.length} مدينة`}`
+                        : 'المدينة'}
+                    </span>
+                  </motion.button>
+                </PopoverTrigger>
+                <PopoverContent 
+                  className="w-auto min-w-[200px] max-w-[280px] p-3" 
+                  align="end" 
+                  side="bottom" 
+                  dir="rtl"
+                  sideOffset={8}
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <h3 className="font-semibold text-sm text-right px-1">اختر المدينة</h3>
+                      {selectedCities.length > 0 && (
+                        <button
+                          onClick={() => {
+                            setSelectedCities([]);
+                            setShowCitiesSelector(false);
+                          }}
+                          className="text-xs text-primary hover:text-primary/80 px-2 py-1 rounded-lg hover:bg-primary/10 transition-colors font-medium"
+                        >
+                          إلغاء الكل
+                        </button>
+                      )}
+                    </div>
+                    <div className="relative mb-2">
+                      <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <input
+                        type="text"
+                        placeholder="ابحث عن مدينة..."
+                        value={citySearch}
+                        onChange={(e) => setCitySearch(e.target.value)}
+                        className="w-full pr-9 pl-3 py-2 text-sm bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
+                        dir="rtl"
+                      />
+                    </div>
+                    <ScrollArea className="h-auto max-h-[240px] scrollbar-hide">
+                      <div className="space-y-1 pr-1">
+                        {availableCities
+                          .filter(city => !citySearch || city.includes(citySearch) || city.toLowerCase().includes(citySearch.toLowerCase()))
+                          .map((city) => {
+                            const isSelected = selectedCities.includes(city);
+                            return (
+                              <label
+                                key={city}
+                                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
+                                  isSelected 
+                                    ? 'bg-primary/10 hover:bg-primary/15' 
+                                    : 'hover:bg-accent'
+                                }`}
+                                dir="rtl"
+                              >
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      setSelectedCities([...selectedCities, city]);
+                                    } else {
+                                      setSelectedCities(selectedCities.filter(c => c !== city));
+                                    }
+                                  }}
+                                  className="shrink-0"
+                                />
+                                <span className={`text-sm font-medium flex-1 ${isSelected ? 'text-primary' : 'text-foreground'}`}>
+                                  {city}
+                                </span>
+                              </label>
+                            );
+                          })}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
+          </div>
+        </div>
+
+        <div className="h-[calc(100vh-200px)] overflow-y-auto scrollbar-hide">
           <div className="space-y-3">
             <motion.div
               initial={{ opacity: 0, y: 10 }}
@@ -396,17 +872,50 @@ export function HistoryScreen({
             <div className="space-y-3">
             {filteredVisits.length === 0 ? (
               <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="text-center py-12"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, ease: 'easeOut' }}
+                className="flex flex-col items-center justify-center h-full min-h-[400px] text-center px-4"
               >
-                <div className="w-24 h-24 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
-                  <Calendar className="w-12 h-12 text-muted-foreground/50" />
-                </div>
-                <h3 className="font-semibold text-lg mb-1">لا توجد زيارات</h3>
-                <p className="text-muted-foreground text-sm">
-                  مفيش زيارات مسجلة في اليوم ده
-                </p>
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ 
+                    scale: 1, 
+                    opacity: 1,
+                    y: [0, -8, 0],
+                  }}
+                  transition={{ 
+                    delay: 0.1,
+                    duration: 0.3,
+                    ease: 'easeOut',
+                    y: {
+                      duration: 3,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                    }
+                  }}
+                  className="mb-6"
+                >
+                  <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center">
+                    <MapPin className="w-10 h-10 text-primary" strokeWidth={1.5} />
+                  </div>
+                </motion.div>
+                <motion.h3
+                  initial={{ y: 10, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.2, duration: 0.3, ease: 'easeOut' }}
+                  className="text-lg font-bold mb-2 text-foreground"
+                >
+                  لا توجد زيارات
+                </motion.h3>
+                <motion.p
+                  initial={{ y: 10, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.3, duration: 0.3, ease: 'easeOut' }}
+                  className="text-sm text-muted-foreground max-w-xs leading-relaxed"
+                >
+                  مفيش زيارات مسجلة في الفترة دي. روح لصفحة التجهيز وابدأ رحلة عشان تسجل زيارات جديدة
+                </motion.p>
               </motion.div>
             ) : (
               filteredVisits.map((visit, index) => {

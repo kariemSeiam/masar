@@ -19,6 +19,11 @@ import { PlaceDetailsSheet } from '@/components/features/places/PlaceDetailsShee
 import { Button } from '@/components/ui/button';
 import { getPlaceIcon } from '@/lib/utils/place';
 import { calculateDistance, formatDistance, formatDuration } from '@/lib/utils/distance';
+import { getGoogleMapsDirectionUrl } from '@/lib/utils/maps';
+import { getWhatsAppUrl } from '@/lib/utils/phone';
+import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
+import { ESTIMATED_TIME_PER_KM } from '@/lib/constants';
+import { MESSAGES } from '@/lib/constants/messages';
 
 interface JourneyScreenProps {
   places: Place[];
@@ -53,10 +58,11 @@ export function JourneyScreen({
   onAddNote,
   onDeleteNote,
   onAddNewPlace,
+  availableData = [],
 }: JourneyScreenProps) {
   const [isCheckInOpen, setIsCheckInOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard();
 
   const currentPlace = places[currentIndex];
 
@@ -66,16 +72,13 @@ export function JourneyScreen({
   }, [userLocation, currentPlace]);
 
   const estimatedTime = useMemo(() => {
-    return distance ? Math.round(distance * 3) : null;
+    return distance ? Math.round(distance * ESTIMATED_TIME_PER_KM) : null;
   }, [distance]);
 
   const handleOpenInMaps = () => {
     if (!currentPlace || typeof window === 'undefined') return;
-    window.open(
-      `https://www.google.com/maps/dir/?api=1&destination=${currentPlace.lat},${currentPlace.lng}`,
-      '_blank',
-      'noopener,noreferrer'
-    );
+    const url = getGoogleMapsDirectionUrl(currentPlace.lat, currentPlace.lng);
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const handleCall = () => {
@@ -85,8 +88,8 @@ export function JourneyScreen({
 
   const handleWhatsApp = () => {
     if (!currentPlace?.phone || typeof window === 'undefined') return;
-    const phone = currentPlace.phone.replace(/[^0-9]/g, '');
-    window.open(`https://wa.me/2${phone}`, '_blank', 'noopener,noreferrer');
+    const url = getWhatsAppUrl(currentPlace.phone);
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
 
@@ -108,7 +111,7 @@ export function JourneyScreen({
   if (!currentPlace) {
     return (
       <div className="h-screen flex items-center justify-center">
-        <p>لا توجد أماكن في الرحلة</p>
+        <p>{MESSAGES.ERRORS.NO_PLACES_IN_JOURNEY}</p>
       </div>
     );
   }
@@ -213,15 +216,10 @@ export function JourneyScreen({
                       <motion.button
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.95 }}
-                        onClick={async (e) => {
+                        onClick={(e) => {
                           e.stopPropagation();
-                          try {
-                            await navigator.clipboard.writeText(currentPlace.phone?.replace(/[^0-9]/g, '') || '');
-                            setCopied(true);
-                            setTimeout(() => setCopied(false), 2000);
-                          } catch (err) {
-                            console.error('Failed to copy:', err);
-                          }
+                          const phoneNumber = currentPlace.phone?.replace(/[^0-9]/g, '') || '';
+                          copy(phoneNumber);
                         }}
                         className="p-1 hover:bg-muted/50 rounded-md transition-colors"
                         title="نسخ الرقم"
@@ -331,6 +329,7 @@ export function JourneyScreen({
         onSubmit={handleCheckInSubmit}
         onAddNewPlace={onAddNewPlace}
         userLocation={userLocation}
+        availableData={availableData}
       />
 
       <PlaceDetailsSheet

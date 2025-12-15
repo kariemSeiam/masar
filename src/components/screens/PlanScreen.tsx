@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useCallback, memo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import dynamic from 'next/dynamic';
-import { List, Map as MapIcon, Filter, X, Minus, GripVertical, MapPin, Circle, CheckCircle, Clock, ChevronDownIcon, Search, Check, Navigation, Target, Locate, Building2, Phone, Globe, CheckSquare, Square, Tag, Calendar } from 'lucide-react';
+import { List, Map as MapIcon, Filter, X, Minus, GripVertical, MapPin, Circle, CheckCircle, Clock, ChevronDownIcon, Search, Check, Navigation, Target, Locate, Building2, Phone, Globe, CheckSquare, Square, Tag, Calendar, Sparkles, ChevronUp, ChevronDown, Ruler } from 'lucide-react';
 import { Place, PlaceStatus, GOVERNORATES, CITIES, STATUS_COLORS, Visit, PLACE_TYPES, PlaceType } from '@/types';
 
 const MapView = dynamic(
@@ -21,12 +21,16 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { BottomSheet } from '@/components/common/bottom-sheet';
-import { calculateDistance } from '@/lib/utils/distance';
+import { calculateDistance, formatDistance, formatDuration, buildDistanceMatrix, calculateRouteDistance, twoOptImprovement } from '@/lib/utils/distance';
+import { getGoogleMapsDirectionUrl } from '@/lib/utils/maps';
+import { getWhatsAppUrl } from '@/lib/utils/phone';
+import { RADIUS_EXPAND_DELAY } from '@/lib/constants/timing';
 
 interface PlanScreenProps {
   places: Place[];
   selectedPlaces: Place[];
   onTogglePlace: (place: Place) => void;
+  onReorderPlaces?: (places: Place[]) => void;
   userLocation: { lat: number; lng: number } | null;
   onPlaceSelect: (place: Place | null) => void;
   selectedPlace: Place | null;
@@ -60,6 +64,7 @@ export function PlanScreen({
   places,
   selectedPlaces,
   onTogglePlace,
+  onReorderPlaces,
   userLocation,
   onPlaceSelect,
   selectedPlace,
@@ -88,20 +93,24 @@ export function PlanScreen({
   );
 
   // Apply initial filter values when they change (for updates from parent)
+  // Only apply when values are provided (not null/undefined/empty)
   const prevInitialFilters = useRef<{ placeType?: string; governorates?: string[]; cities?: string[] } | null>(null);
+  const hasAppliedInitialFilters = useRef(false);
+  
   useEffect(() => {
-    // Apply filters if they're provided and different from current state or previous initial values
+    // Only apply initial filters once when they're first provided
+    // Don't clear filters when initialMapFilters becomes null
     const shouldUpdatePlaceType = initialPlaceType && (
-      !prevInitialFilters.current?.placeType || 
-      prevInitialFilters.current.placeType !== initialPlaceType
+      !hasAppliedInitialFilters.current || 
+      prevInitialFilters.current?.placeType !== initialPlaceType
     );
     const shouldUpdateGovernorates = initialGovernorates && initialGovernorates.length > 0 && (
-      !prevInitialFilters.current?.governorates || 
-      JSON.stringify(prevInitialFilters.current.governorates) !== JSON.stringify(initialGovernorates)
+      !hasAppliedInitialFilters.current || 
+      JSON.stringify(prevInitialFilters.current?.governorates) !== JSON.stringify(initialGovernorates)
     );
     const shouldUpdateCities = initialCities && initialCities.length > 0 && (
-      !prevInitialFilters.current?.cities || 
-      JSON.stringify(prevInitialFilters.current.cities) !== JSON.stringify(initialCities)
+      !hasAppliedInitialFilters.current || 
+      JSON.stringify(prevInitialFilters.current?.cities) !== JSON.stringify(initialCities)
     );
     
     if (shouldUpdatePlaceType || shouldUpdateGovernorates || shouldUpdateCities) {
@@ -115,10 +124,10 @@ export function PlanScreen({
         setCities(initialCities);
       }
       prevInitialFilters.current = { placeType: initialPlaceType, governorates: initialGovernorates, cities: initialCities };
+      hasAppliedInitialFilters.current = true;
     }
   }, [initialPlaceType, initialGovernorates, initialCities]);
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
-  const [showLocationSelectors, setShowLocationSelectors] = useState(false);
   const [radiusKm, setRadiusKm] = useState<number | null>(null);
   const [showRadiusControl, setShowRadiusControl] = useState(false);
   const [radiusMin, setRadiusMin] = useState<number>(0);
@@ -155,11 +164,88 @@ export function PlanScreen({
       }
     };
   }, []);
-  const [governorateSearch, setGovernorateSearch] = useState<string>('');
-  const [citySearch, setCitySearch] = useState<string>('');
   const [hasPhoneFilter, setHasPhoneFilter] = useState<boolean>(false);
   const [hasWebsiteFilter, setHasWebsiteFilter] = useState<boolean>(false);
   const [showTypeSelector, setShowTypeSelector] = useState<boolean>(false);
+
+  // Smart routing function with distance matrix and 2-opt improvement
+  // Always starts with the nearest place to user location
+  const handleSmartRouting = useCallback(() => {
+    if (selectedPlaces.length < 2 || !userLocation || !onReorderPlaces) return;
+    
+    // Build points array: [userLocation, ...selectedPlaces]
+    const points = [
+      userLocation,
+      ...selectedPlaces.map(p => ({ lat: p.lat, lng: p.lng }))
+    ];
+    
+    // Build distance matrix for all points
+    const distanceMatrix = buildDistanceMatrix(points);
+    
+    // Find the nearest place to user location (index 0)
+    let nearestPlaceIndex = 1; // First place index in points array
+    let nearestDistance = distanceMatrix[0][1];
+    
+    for (let i = 2; i < points.length; i++) {
+      const distance = distanceMatrix[0][i];
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestPlaceIndex = i;
+      }
+    }
+    
+    // Start route with nearest place
+    const unvisited = Array.from({ length: selectedPlaces.length }, (_, i) => i + 1)
+      .filter(idx => idx !== nearestPlaceIndex); // Remove nearest from unvisited
+    const route: number[] = [0, nearestPlaceIndex]; // Start at user location, then nearest place
+    let currentIndex = nearestPlaceIndex;
+    
+    // Continue with Nearest Neighbor algorithm
+    while (unvisited.length > 0) {
+      let nearestIndex = 0;
+      let nearestDist = distanceMatrix[currentIndex][unvisited[0]];
+      
+      for (let i = 1; i < unvisited.length; i++) {
+        const distance = distanceMatrix[currentIndex][unvisited[i]];
+        if (distance < nearestDist) {
+          nearestDist = distance;
+          nearestIndex = i;
+        }
+      }
+      
+      const nearest = unvisited.splice(nearestIndex, 1)[0];
+      route.push(nearest);
+      currentIndex = nearest;
+    }
+    
+    // Apply 2-opt improvement for better results
+    // Preserve first place (nearest to user) and user location (index 0)
+    const improvedRoute = twoOptImprovement(route, distanceMatrix, true);
+    
+    // Convert route indices to places (skip index 0 which is user location)
+    // First place in result will always be the nearest to user location
+    const optimized: Place[] = improvedRoute
+      .slice(1) // Remove user location from route
+      .map(index => selectedPlaces[index - 1]); // Convert to place index (subtract 1 because points[0] is user location)
+    
+    onReorderPlaces(optimized);
+  }, [selectedPlaces, userLocation, onReorderPlaces]);
+
+  // Move place up in order
+  const handleMoveUp = useCallback((index: number) => {
+    if (index === 0 || !onReorderPlaces) return;
+    const newPlaces = [...selectedPlaces];
+    [newPlaces[index - 1], newPlaces[index]] = [newPlaces[index], newPlaces[index - 1]];
+    onReorderPlaces(newPlaces);
+  }, [selectedPlaces, onReorderPlaces]);
+
+  // Move place down in order
+  const handleMoveDown = useCallback((index: number) => {
+    if (index === selectedPlaces.length - 1 || !onReorderPlaces) return;
+    const newPlaces = [...selectedPlaces];
+    [newPlaces[index], newPlaces[index + 1]] = [newPlaces[index + 1], newPlaces[index]];
+    onReorderPlaces(newPlaces);
+  }, [selectedPlaces, onReorderPlaces]);
 
   const selectedPlaceIds = useMemo(() => {
     return new Set(selectedPlaces.map(p => p.id));
@@ -177,7 +263,14 @@ export function PlanScreen({
 
   const filteredPlaces = useMemo(() => {
     // If no governorates and no cities are selected, show no places
+    // This ensures the map is empty when no filter is applied
     if (governorates.length === 0 && cities.length === 0) {
+      return [];
+    }
+    
+    // Also return empty if no place type is selected (when place type filter is required)
+    // This provides an additional safeguard
+    if (selectedPlaceTypes.length > 0 && governorates.length === 0 && cities.length === 0) {
       return [];
     }
     
@@ -250,30 +343,6 @@ export function PlanScreen({
     return filteredPlaces.every(place => selectedPlaceIds.has(place.id));
   }, [filteredPlaces, selectedPlaceIds]);
 
-  const availableCities = useMemo(() => {
-    const allCities: string[] = [];
-    governorates.forEach((gov) => {
-      const govCities = CITIES[gov] || [];
-      allCities.push(...govCities);
-    });
-    return Array.from(new Set(allCities));
-  }, [governorates]);
-
-  const filteredGovernorates = useMemo(() => {
-    if (!governorateSearch) return GOVERNORATES;
-    return GOVERNORATES.filter(gov => 
-      gov.toLowerCase().includes(governorateSearch.toLowerCase()) ||
-      gov.includes(governorateSearch)
-    );
-  }, [governorateSearch]);
-
-  const filteredCities = useMemo(() => {
-    if (!citySearch) return availableCities;
-    return availableCities.filter(city => 
-      city.toLowerCase().includes(citySearch.toLowerCase()) ||
-      city.includes(citySearch)
-    );
-  }, [citySearch, availableCities]);
 
   return (
     <div className="h-screen flex flex-col">
@@ -286,13 +355,22 @@ export function PlanScreen({
               onPlaceSelect={onPlaceSelect}
               journeyPlaces={selectedPlaces}
               userLocation={userLocation}
-              onLocationEdit={() => setShowLocationSelectors(true)}
               selectedGovernorates={governorates}
               selectedCities={cities}
               radiusKm={radiusKm}
               availableData={availableData}
+              initialPlaceType={selectedPlaceTypes.length > 0 ? selectedPlaceTypes.join(',') : null}
+              initialGovernorates={governorates.length > 0 ? governorates : []}
+              initialCities={cities.length > 0 ? cities : []}
               onPlaceTypeChange={(placeType) => {
-                // Handle place type change if needed
+                // Update selectedPlaceTypes when place type changes in MapView
+                if (placeType === null || placeType === '') {
+                  setSelectedPlaceTypes([]);
+                } else {
+                  // Parse comma-separated place types
+                  const types = placeType.split(',').filter(Boolean) as PlaceType[];
+                  setSelectedPlaceTypes(types);
+                }
               }}
               onGovernoratesChange={(newGovernorates) => {
                 setGovernorates(newGovernorates);
@@ -303,10 +381,7 @@ export function PlanScreen({
             />
 
             <motion.div
-              animate={{ top: showLocationSelectors ? '8.5rem' : '5rem' }}
-              transition={{ duration: 0.15, ease: 'easeOut' }}
-              className="absolute end-4 start-4 z-10"
-              style={{ willChange: 'top' }}
+              className="absolute top-20 end-4 start-4 z-10"
             >
               <div 
                 className="flex flex-nowrap gap-2 overflow-x-auto py-2 scrollbar-hide"
@@ -357,147 +432,15 @@ export function PlanScreen({
                       />
                       <span className={`text-sm font-medium ${isSelected ? 'text-white' : ''}`} style={!isSelected ? { color: statusColor } : undefined}>
                         {filter.label}
-                        <span className="mr-1 opacity-80">({statusCounts[filter.id as keyof typeof statusCounts]})</span>
+                        {statusCounts[filter.id as keyof typeof statusCounts] > 0 && (
+                          <span className="mr-1 opacity-80">({statusCounts[filter.id as keyof typeof statusCounts]})</span>
+                        )}
                       </span>
                     </motion.button>
                   );
                 })}
               </div>
             </motion.div>
-
-            <AnimatePresence>
-              {showLocationSelectors && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.15, ease: 'easeOut' }}
-                  className="absolute top-20 end-4 start-4 z-10"
-                  style={{ willChange: 'transform, opacity' }}
-                >
-                  <div className="flex gap-2 mt-2">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button className="glass border-0 h-10 rounded-xl flex-1 px-3 text-sm text-right flex items-center justify-between gap-2 hover:bg-card/90 transition-colors">
-                          <span className="text-muted-foreground">
-                            {governorates.length === 0 
-                              ? 'المحافظة' 
-                              : governorates.length === 1 
-                                ? governorates[0] 
-                                : `${governorates.length} محافظة`}
-                          </span>
-                          <ChevronDownIcon className="w-4 h-4 opacity-50" />
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-(--radix-popover-trigger-width) p-2" align="start">
-                        <div className="mb-2">
-                          <div className="relative">
-                            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                            <input
-                              type="text"
-                              placeholder="ابحث..."
-                              value={governorateSearch}
-                              onChange={(e) => setGovernorateSearch(e.target.value)}
-                              className="w-full pr-9 pl-3 py-2 text-sm bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
-                              dir="rtl"
-                            />
-                          </div>
-                        </div>
-                        <div className="space-y-1 max-h-64 overflow-y-auto">
-                          {filteredGovernorates.length > 0 ? (
-                            filteredGovernorates.map((gov) => (
-                              <label
-                                key={gov}
-                                className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent cursor-pointer"
-                              >
-                                <Checkbox
-                                  checked={governorates.includes(gov)}
-                                  onCheckedChange={(checked) => {
-                                    if (checked) {
-                                      setGovernorates([...governorates, gov]);
-                                    } else {
-                                      setGovernorates(governorates.filter(g => g !== gov));
-                                    }
-                                  }}
-                                />
-                                <span className="text-sm">{gov}</span>
-                              </label>
-                            ))
-                          ) : (
-                            <div className="px-2 py-4 text-center text-sm text-muted-foreground">
-                              لا توجد نتائج
-                            </div>
-                          )}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button className="glass border-0 h-10 rounded-xl flex-1 px-3 text-sm text-right flex items-center justify-between gap-2 hover:bg-card/90 transition-colors">
-                          <span className="text-muted-foreground">
-                            {cities.length === 0 
-                              ? 'المدينة' 
-                              : cities.length === 1 
-                                ? cities[0] 
-                                : `${cities.length} مدينة`}
-                          </span>
-                          <ChevronDownIcon className="w-4 h-4 opacity-50" />
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-(--radix-popover-trigger-width) p-2" align="start">
-                        <div className="mb-2">
-                          <div className="relative">
-                            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                            <input
-                              type="text"
-                              placeholder="ابحث..."
-                              value={citySearch}
-                              onChange={(e) => setCitySearch(e.target.value)}
-                              className="w-full pr-9 pl-3 py-2 text-sm bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
-                              dir="rtl"
-                            />
-                          </div>
-                        </div>
-                        <div className="space-y-1 max-h-64 overflow-y-auto">
-                          {filteredCities.length > 0 ? (
-                            filteredCities.map((c) => (
-                              <label
-                                key={c}
-                                className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent cursor-pointer"
-                              >
-                                <Checkbox
-                                  checked={cities.includes(c)}
-                                  onCheckedChange={(checked) => {
-                                    if (checked) {
-                                      setCities([...cities, c]);
-                                    } else {
-                                      setCities(cities.filter(city => city !== c));
-                                    }
-                                  }}
-                                />
-                                <span className="text-sm">{c}</span>
-                              </label>
-                            ))
-                          ) : (
-                            <div className="px-2 py-4 text-center text-sm text-muted-foreground">
-                              لا توجد نتائج
-                            </div>
-                          )}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-
-                    <button
-                      onClick={() => setShowLocationSelectors(false)}
-                      className="w-10 h-10 bg-[#22C55E] dark:bg-[#16A34A] rounded-xl flex items-center justify-center hover:bg-[#16A34A] dark:hover:bg-[#15803D] transition-all shadow-elevated hover:scale-105 active:scale-95 ring-2 ring-green-500/20 dark:ring-green-400/20"
-                    >
-                      <Check className="w-5 h-5 text-white" strokeWidth={3} />
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
 
             <AnimatePresence>
               {!selectedPlace && (
@@ -621,12 +564,12 @@ export function PlanScreen({
                                     // Keep value at old max (which is now the center/min) so slider stays in position
                                     setRadiusKm(oldMax);
                                     
-                                    // Set cooldown for 1 second to prevent immediate re-trigger
+                                    // Set cooldown to prevent immediate re-trigger
                                     radiusChangeCooldownRef.current = true;
                                     radiusExpandTimeoutRef.current = setTimeout(() => {
                                       radiusChangeCooldownRef.current = false;
                                       radiusExpandTimeoutRef.current = null;
-                                    }, 1000);
+                                    }, RADIUS_EXPAND_DELAY);
                                   } 
                                   // If reached min and min > 0 (meaning we've expanded before), immediately collapse and set cooldown
                                   else if (newValue <= radiusMin + 0.01 && radiusMin > 0) {
@@ -643,12 +586,12 @@ export function PlanScreen({
                                     // Set value to the old max (which is now the new max)
                                     setRadiusKm(valueToSet);
                                     
-                                    // Set cooldown for 1 second to prevent immediate re-trigger
+                                    // Set cooldown to prevent immediate re-trigger
                                     radiusChangeCooldownRef.current = true;
                                     radiusCollapseTimeoutRef.current = setTimeout(() => {
                                       radiusChangeCooldownRef.current = false;
                                       radiusCollapseTimeoutRef.current = null;
-                                    }, 1000);
+                                    }, RADIUS_EXPAND_DELAY);
                                   } else {
                                     setRadiusKm(newValue);
                                   }
@@ -724,14 +667,13 @@ export function PlanScreen({
                     notesCount={placeNotesCount.get(selectedPlace.id) || 0}
                     onOpenInMaps={() => {
                       if (typeof window !== 'undefined') {
-                        const url = `https://www.google.com/maps/dir/?api=1&destination=${selectedPlace.lat},${selectedPlace.lng}`;
+                        const url = getGoogleMapsDirectionUrl(selectedPlace.lat, selectedPlace.lng);
                         window.open(url, '_blank', 'noopener,noreferrer');
                       }
                     }}
                     onWhatsApp={() => {
                       if (typeof window !== 'undefined' && selectedPlace.phone) {
-                        const phoneNumber = selectedPlace.phone.replace(/[^0-9]/g, '');
-                        const url = `https://wa.me/${phoneNumber}`;
+                        const url = getWhatsAppUrl(selectedPlace.phone);
                         window.open(url, '_blank', 'noopener,noreferrer');
                       }
                     }}
@@ -751,36 +693,104 @@ export function PlanScreen({
             enableDrag={true}
             enableBackdropDismiss={true}
             closeOnDragDown={true}
+            autoSize={true}
             contentClassName="p-0"
             aria-label="الأماكن المحددة"
+            headerActions={
+              selectedPlaces.length > 1 && userLocation && onReorderPlaces ? (
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleSmartRouting}
+                  className="w-10 h-10 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center transition-colors shrink-0"
+                  title="توجيه ذكي"
+                >
+                  <Sparkles className="w-4 h-4 text-primary" />
+                </motion.button>
+              ) : undefined
+            }
           >
-            <div className="p-4">
-              <div className="space-y-2">
-                {selectedPlaces.map((place, index) => (
-                  <motion.div
-                    key={place.id}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.03, duration: 0.15, ease: 'easeOut' }}
-                    className="flex items-center gap-3 bg-muted/50 rounded-xl p-3"
-                    style={{ willChange: 'transform, opacity' }}
-                  >
-                    <div className="flex items-center justify-center w-8 h-8 gradient-primary rounded-full text-white text-sm font-bold">
-                      {index + 1}
+            <div className="px-4 pb-4">
+              <div className="space-y-3">
+                {selectedPlaces.map((place, index) => {
+                  // Calculate distance and duration to next place
+                  const nextPlace = index < selectedPlaces.length - 1 ? selectedPlaces[index + 1] : null;
+                  const distance = nextPlace ? calculateDistance(place.lat, place.lng, nextPlace.lat, nextPlace.lng) : null;
+                  const duration = distance ? Math.round(distance * 3) : null; // 3 minutes per km
+                  
+                  return (
+                    <div key={place.id} className="space-y-2">
+                      <motion.div
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.03, duration: 0.15, ease: 'easeOut' }}
+                        className="flex items-center gap-3 bg-muted/50 rounded-xl p-3"
+                        style={{ willChange: 'transform, opacity' }}
+                      >
+                        <div className="flex items-center justify-center w-8 h-8 gradient-primary rounded-full text-white text-sm font-bold shrink-0">
+                          {index + 1}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-foreground">{place.name}</p>
+                          <p className="text-sm text-muted-foreground truncate">{place.address || `${place.city}، ${place.governorate}`}</p>
+                        </div>
+                        {onReorderPlaces && (
+                          <div className="flex flex-col gap-1 shrink-0">
+                            <motion.button
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                              onClick={() => handleMoveUp(index)}
+                              disabled={index === 0}
+                              className="w-7 h-7 rounded-lg bg-card hover:bg-accent flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                              title="نقل لأعلى"
+                            >
+                              <ChevronUp className="w-3.5 h-3.5 text-foreground" />
+                            </motion.button>
+                            <motion.button
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                              onClick={() => handleMoveDown(index)}
+                              disabled={index === selectedPlaces.length - 1}
+                              className="w-7 h-7 rounded-lg bg-card hover:bg-accent flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                              title="نقل لأسفل"
+                            >
+                              <ChevronDown className="w-3.5 h-3.5 text-foreground" />
+                            </motion.button>
+                          </div>
+                        )}
+                        <button
+                          onClick={() => onTogglePlace(place)}
+                          className="w-8 h-8 rounded-full bg-destructive/10 text-destructive flex items-center justify-center hover:bg-destructive/20 shrink-0"
+                          title="إزالة"
+                        >
+                          <Minus className="w-4 h-4" />
+                        </button>
+                      </motion.div>
+                      {nextPlace && distance !== null && duration !== null && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="flex items-center justify-center gap-3 py-2"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <Ruler className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                            <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
+                              {formatDistance(distance)}
+                            </span>
+                          </div>
+                          <div className="w-1 h-1 rounded-full bg-muted-foreground/30"></div>
+                          <div className="flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400 shrink-0" />
+                            <span className="text-xs font-semibold text-orange-600 dark:text-orange-400">
+                              {formatDuration(duration)}
+                            </span>
+                          </div>
+                        </motion.div>
+                      )}
                     </div>
-                    <GripVertical className="w-4 h-4 text-muted-foreground cursor-move" />
-                    <div className="flex-1">
-                      <p className="font-medium">{place.name}</p>
-                      <p className="text-sm text-muted-foreground">{place.address}</p>
-                    </div>
-                    <button
-                      onClick={() => onTogglePlace(place)}
-                      className="w-8 h-8 rounded-full bg-destructive/10 text-destructive flex items-center justify-center hover:bg-destructive/20"
-                    >
-                      <Minus className="w-4 h-4" />
-                    </button>
-                  </motion.div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </BottomSheet>
@@ -858,7 +868,9 @@ export function PlanScreen({
                     />
                     <span className={`text-sm font-medium leading-5 ${isSelected ? 'text-white' : ''}`} style={!isSelected ? { color: statusColor } : undefined}>
                       {filter.label}
-                      <span className="mr-1 opacity-80">({statusCounts[filter.id as keyof typeof statusCounts]})</span>
+                      {statusCounts[filter.id as keyof typeof statusCounts] > 0 && (
+                        <span className="mr-1 opacity-80">({statusCounts[filter.id as keyof typeof statusCounts]})</span>
+                      )}
                     </span>
                   </motion.button>
                 );
