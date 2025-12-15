@@ -17,6 +17,7 @@ interface CheckInModalProps {
   onSubmit: (outcome: VisitOutcome, notes: string, rating?: number) => void;
   onAddNewPlace?: (place: Omit<Place, 'id' | 'createdAt'>) => void;
   userLocation?: { lat: number; lng: number } | null;
+  availableData?: { type: string; count: number; cities?: string[]; governorates?: string[] }[];
 }
 
 const outcomes: { id: VisitOutcome; label: string; icon: typeof Check; color: string; lightColor: string; bg: string }[] = [
@@ -28,7 +29,7 @@ const outcomes: { id: VisitOutcome; label: string; icon: typeof Check; color: st
 
 const resultOptions = ['تم البيع', 'مهتم', 'غير مهتم'];
 
-export function CheckInModal({ place, isOpen, onClose, onSubmit, onAddNewPlace, userLocation }: CheckInModalProps) {
+export function CheckInModal({ place, isOpen, onClose, onSubmit, onAddNewPlace, userLocation, availableData = [] }: CheckInModalProps) {
   const [selectedOutcome, setSelectedOutcome] = useState<VisitOutcome | null>(null);
   const [notes, setNotes] = useState('');
   const [rating, setRating] = useState(0);
@@ -75,6 +76,7 @@ export function CheckInModal({ place, isOpen, onClose, onSubmit, onAddNewPlace, 
       closeOnDragDown={true}
       dragThreshold={80}
       showCloseButton={false}
+      autoSize={true}
       contentClassName="p-0"
       aria-label="تسجيل زيارة"
     >
@@ -272,6 +274,7 @@ export function CheckInModal({ place, isOpen, onClose, onSubmit, onAddNewPlace, 
         onClose={() => setIsAddPlaceOpen(false)}
         onSave={handleAddNewPlace}
         userLocation={userLocation || null}
+        availableData={availableData}
       />
     </BottomSheet>
   );
